@@ -144,7 +144,7 @@ const TYPES={
  tiempo:{n:'Por tiempo (segundos)',d:{s:3,lo:20,hi:40,r:60,inc:0,seg:1,bw:1}},
  cardio:{n:'Cardio (minutos)',d:{s:1,lo:20,hi:20,r:0,inc:0,seg:1,min:1,spd:1}}
 };
-const EDITABLE=['s','lo','hi','r'];
+const EDITABLE=['s','lo','hi','r','side'];   // Tsuyo: «side» permite hacer por lados un ejercicio del catálogo
 
 function exBase(id){return EXC[id]||(DB.cex||{})[id]||null}
 function exResolve(ref){
@@ -258,7 +258,7 @@ function sanitizeDB(r){
   if(isObj(r.plan)&&Array.isArray(r.plan.days)){
     const days=r.plan.days.slice(0,6).filter(isObj).map((d,i)=>({n:sStr(d.n,40)||('Día '+(i+1)),
       ex:(Array.isArray(d.ex)?d.ex:[]).filter(x=>isObj(x)&&RX_ID.test(x.id)).slice(0,25).map(x=>{
-        const o={id:x.id};[['s',1,10],['lo',1,999],['hi',1,999],['r',0,600]].forEach(([k,a,b])=>{const v=sNum(x[k],a,b);if(v!=null)o[k]=Math.round(v)});return o})}));
+        const o={id:x.id};[['s',1,10],['lo',1,999],['hi',1,999],['r',0,600],['side',0,1]].forEach(([k,a,b])=>{const v=sNum(x[k],a,b);if(v!=null)o[k]=Math.round(v)});return o})}));
     if(days.length)out.plan={src:sStr(r.plan.src,20).replace(/[^a-z0-9_]/gi,'')||'custom',edited:!!r.plan.edited,
       prio:(Array.isArray(r.plan.prio)?r.plan.prio:[]).map(Number).filter(n=>n>=1&&n<=days.length),days};
   }

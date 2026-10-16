@@ -319,7 +319,7 @@ function renderRut(){
   const src=DB.plan?.src,t=TPLS[src],av=(DB.cfg.avail||[]).slice().sort((a,b)=>((a+6)%7)-((b+6)%7));
   let h='<div class="head"><div><h1 class="lt">Rutina</h1></div></div><div class="pad" style="padding-top:14px">';
   h+='<div class="card" style="padding:14px 16px 16px 18px"><div class="row" style="justify-content:space-between"><p class="fn l2">Tu plan</p><button class="fn link" style="height:28px" onclick="openTplPicker()">Cambiar de rutina</button></div>'+
-    '<p class="t3" style="margin-top:1px">'+(DB.plan?(t?esc(t.n):'Rutina propia')+(DB.plan.edited?' · editada':''):'Sin rutina')+'</p>'+
+    '<p class="t3" style="margin-top:1px">'+(DB.plan?(t?esc(t.n)+(DB.plan.edited?' · editada':''):(src==='nexa'?'Tu rutina de NEXA Fit':'Rutina propia')):'Sin rutina')+'</p>'+
     '<p class="fn l2" style="margin-top:1px">'+dayKeys().length+' sesiones · entrenas '+av.map(d=>DIAS3[d].toLowerCase()).join(', ')+'</p></div></div>';
   if(dayKeys().length){
     h+='<div class="sec"><div class="stitle"><h3 class="t3">Sesiones</h3><span class="fn l2">toca para ver o editar</span></div><div class="pad"><div class="group">'+
@@ -331,7 +331,7 @@ function renderRut(){
 }
 function openDaySheet(k){
   const p=PLAN[k],plus=isPlus();
-  openSheet(()=>({title:esc(PLAN[k].n),body:'<div class="pad"><p class="fn l2" style="padding:0 16px 10px">'+PLAN[k].ex.length+' ejercicios · '+totalSets(k)+' series · unos '+estMin(k)+' min</p><div class="group">'+
+  openSheet(()=>({title:esc(PLAN[k].n),body:'<div class="pad"><div class="field" style="margin-bottom:10px"><label for="dayName">Nombre de la sesión</label><input id="dayName" value="'+esc(PLAN[k].n)+'" maxlength="40" onchange="renameDay('+k+',this.value)"></div><p class="fn l2" style="padding:0 16px 10px">'+PLAN[k].ex.length+' ejercicios · '+totalSets(k)+' series · unos '+estMin(k)+' min</p><div class="group">'+
     PLAN[k].ex.map((e,i)=>'<button class="cell" onclick="openExSheet('+k+','+i+')"><span class="exn">'+(i+1)+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(e.n)+'</p><p class="fn l2 num">'+exLine(e)+' · descanso '+mmss(e.r)+'</p></div>'+chev()+'</div></button>').join('')+'</div>'+
     (plus?'<button class="btn sec" style="margin-top:12px" onclick="openCatalog('+k+')">'+ic('plus',18)+'Añadir ejercicio</button>'
       :'<button class="cell" style="margin-top:12px;background:var(--sheet2);border-radius:22px" onclick="openPlus()"><span class="ic soft">'+ic('pen',17)+'</span><div class="cb"><div class="tt"><p class="bd">Editar esta sesión</p><p class="fn l2">Ejercicios, series y descansos</p></div><span class="pill plus">Plus</span></div></button>')+
@@ -433,6 +433,7 @@ function meSheet(){
       [['auto','Automática'],['light','Clara'],['dark','Oscura']].map(([k,l])=>'<button class="'+(th===k?'on':'')+'" onclick="setTheme(\''+k+'\')">'+l+'</button>').join('')+'</div></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" style="padding-left:16px">Tus datos</p><div class="group">'+
       '<button class="cell" onclick="downloadData()"><span class="ic gray">'+ic('down',17)+'</span><div class="cb"><span class="tt bd">Descargar mis datos</span></div></button>'+
+      '<button class="cell" onclick="openImport()"><span class="ic gray">'+ic('up',17)+'</span><div class="cb"><div class="tt"><p class="bd">Importar una copia</p><p class="fn l2">De Tsuyo o de NEXA Fit</p></div>'+chev()+'</div></button>'+
       '<button class="cell" onclick="openPrivacy()"><span class="ic gray">'+ic('shield',17)+'</span><div class="cb"><span class="tt bd">Privacidad</span>'+chev()+'</div></button>'+
       (CLOUD&&!USER?'<button class="cell" onclick="openAuth(\'up\',true)"><span class="ic soft">'+ic('user',17)+'</span><div class="cb"><div class="tt"><p class="bd">Crear cuenta</p><p class="fn l2">Guarda tus datos en la nube</p></div>'+chev()+'</div></button>':'')+
       (USER?'<button class="cell" onclick="askLogout()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><span class="tt bd">Cerrar sesión</span></div></button>':'')+
@@ -481,6 +482,68 @@ function askDelete(){confirmSheet(USER?'Eliminar cuenta':'Borrar datos',USER?'Se
 async function doDelete(){
   try{await deleteAccount()}catch(e){toast(e.message);return}
   closeSheet();started=false;DB=freshDB();PREF.set('force',null);toast('Datos borrados');showWelcome();
+}
+
+function renameDay(k,v){v=v.trim().slice(0,40);if(!v)return;DB.plan.days[k-1].n=v;save();buildPlan();drawSheet();render();toast('Nombre guardado')}
+
+/* ═════ IMPORTAR ═════ */
+let IMP=null;
+function openImport(){
+  openSheet(()=>({title:'Importar una copia',body:'<div class="pad stack">'+
+    '<p class="sb l2" style="padding:0 6px">Elige el archivo de una copia o pega aquí su texto. Sirve una copia de Tsuyo o la exportación de NEXA Fit (Guía → Datos → Exportar).</p>'+
+    '<label class="btn sec" for="impFile">'+ic('down',18)+'Elegir archivo</label><input id="impFile" type="file" accept=".json,.txt,application/json,text/plain" hidden onchange="impFile(this)">'+
+    '<div class="field"><label for="impText">O pega el texto</label><textarea id="impText" rows="5" style="border:0;border-radius:14px;background:var(--sheet2);padding:12px 14px;font-size:14px;line-height:19px;resize:vertical;font-family:ui-monospace,Menlo,monospace" placeholder="{&quot;v&quot;:1,&quot;sess&quot;:{…"></textarea></div>'+
+    '<p class="msg" id="impMsg"></p><button class="btn pri" onclick="impCheck($(\'impText\').value)">Revisar</button></div>'}),true);
+}
+function impFile(inp){const f=inp.files&&inp.files[0];if(!f)return;const r=new FileReader();r.onload=()=>impCheck(String(r.result||''));r.onerror=()=>{const m=$('impMsg');if(m)m.textContent='No se pudo leer el archivo.'};r.readAsText(f)}
+function impCheck(txt){
+  const msg=m=>{const e=$('impMsg');if(e)e.textContent=m};
+  let o;try{o=JSON.parse(String(txt).trim())}catch(e){return msg('Ese texto no es una copia válida. Cópiala entera, desde la primera llave hasta la última.')}
+  if(!o||typeof o!=='object'||!o.sess||typeof o.sess!=='object')return msg('No encuentro sesiones en esa copia.');
+  const ds=Object.keys(o.sess).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  const done=ds.filter(d=>o.sess[d]&&o.sess[d].ex&&Object.values(o.sess[d].ex).some(a=>Array.isArray(a)&&a.some(x=>x&&x.r)));
+  let plan=null,inferred=false;
+  if(o.plan&&Array.isArray(o.plan.days)&&o.plan.days.length)plan=o.plan;
+  else{plan=inferPlan(o,done);inferred=true}
+  if(!plan||!plan.days.length)return msg('No he podido deducir la rutina de esa copia.');
+  IMP={o,plan,inferred,done};
+  const unknown=[...new Set(plan.days.flatMap(d=>d.ex.map(e=>e.id)).filter(id=>!EXC[id]&&!(o.cex||{})[id]))];
+  openSheet(()=>({title:'Revisar copia',body:'<div class="pad stack">'+
+    '<div class="card" style="padding:14px 16px"><p class="hl">'+done.length+' sesiones</p><p class="fn l2">'+(done.length?'Del '+fmtD(done[0])+' al '+fmtD(done[done.length-1]):'Sin entrenos registrados')+(o.cfg&&o.cfg.start?' · bloque iniciado el '+fmtD(o.cfg.start):'')+'</p></div>'+
+    '<p class="ghead" style="padding-left:16px;margin-bottom:-4px">'+(inferred?'Rutina deducida de tu historial':'Rutina de la copia')+'</p>'+
+    plan.days.map((d,i)=>'<div class="card" style="padding:12px 16px"><p class="hl">'+esc(d.n)+'</p><p class="fn l2" style="margin-top:3px">'+d.ex.map(e=>esc((EXC[e.id]||(o.cex||{})[e.id]||{n:e.id}).n)+(e.s?' ('+e.s+(e.side?' por lado':'')+')':(e.side?' (por lado)':''))).join(' · ')+'</p></div>').join('')+
+    (unknown.length?'<div class="note">Hay ejercicios que Tsuyo no conoce: '+unknown.map(esc).join(', ')+'. Se añadirán como ejercicios propios.</div>':'')+
+    '<p class="fn l2" style="padding:0 6px">'+(inferred?'Los rangos y descansos son los de cada ejercicio por defecto; con Plus puedes ajustarlos. ':'')+'Tu rutina actual de Tsuyo se sustituye; las sesiones que ya tengas se conservan.</p>'+
+    '<button class="btn pri" onclick="impApply()">Importar</button><button class="btn sec" onclick="backSheet()">Cancelar</button></div>'}),true);
+}
+/* deduce la rutina del historial: para cada día, los ejercicios de su última sesión, en orden, y las series más habituales */
+function inferPlan(o,done){
+  const byDay={};
+  done.forEach(d=>{const s=o.sess[d],n=Math.round(Number(s.day));if(!(n>=1&&n<=6))return;(byDay[n]=byDay[n]||[]).push(d)});
+  const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
+  if(!days.length)return null;
+  return{src:'nexa',edited:true,prio:days.map((_,i)=>i+1),days:days.map(n=>{
+    const recent=byDay[n].slice(-3),last=o.sess[recent[recent.length-1]].ex;
+    const ids=Object.keys(last).filter(id=>/^[A-Za-z0-9_-]{1,40}$/.test(id)&&Array.isArray(last[id])&&last[id].some(x=>x&&x.r));
+    return{n:'Día '+n,ex:ids.map(id=>{
+      const counts=recent.map(d=>((o.sess[d].ex||{})[id]||[]).filter(x=>x&&x.r).length).filter(Boolean);
+      const base=EXC[id],steps=counts.length?Math.max(...counts):0;
+      const x={id};let sets=base&&base.side?Math.round(steps/2):steps;
+      if(base&&!base.side&&!base.seg&&steps===2*base.s){x.side=1;sets=base.s}   // registrado por lados
+      if(sets&&base&&sets!==base.s)x.s=Math.min(10,sets);return x})};
+  })};
+}
+function impApply(){
+  if(!IMP)return;const {o,plan}=IMP;
+  const cex=Object.assign({},DB.cex,o.cex||{});
+  plan.days.forEach(d=>d.ex.forEach(e=>{if(!EXC[e.id]&&!cex[e.id])cex[e.id]={n:e.id.replace(/[_-]+/g,' ').replace(/^./,c=>c.toUpperCase()),g:'Core',t:'peso'}}));
+  const next=Object.assign({},DB,{plan:{src:plan.src||'nexa',edited:!!plan.edited,prio:plan.prio||plan.days.map((_,i)=>i+1),days:plan.days},cex,
+    sess:Object.assign({},DB.sess,o.sess),skips:Object.assign({},DB.skips,o.skips||{})});
+  if(o.cfg&&/^\d{4}-\d{2}-\d{2}$/.test(o.cfg.start||''))next.cfg=Object.assign({},DB.cfg,{start:o.cfg.start});
+  if(o.cfg&&Array.isArray(o.cfg.avail)&&o.cfg.avail.length)next.cfg=Object.assign({},next.cfg||DB.cfg,{avail:o.cfg.avail});
+  if(o.profile&&o.profile.done)next.profile=Object.assign({},DB.profile,o.profile,{deshi:DB.profile.deshi||o.profile.deshi});
+  DB=mergeDefaults(next);save();buildPlan();IMP=null;PREF.set('force',null);closeSheet();go('hoy');
+  toast('Copia importada: '+Object.keys(DB.sess).filter(sessDone).length+' sesiones');
 }
 
 /* ═════ PLUS (simulado) ═════ */
