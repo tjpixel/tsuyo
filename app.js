@@ -525,17 +525,22 @@ function impAlias(o){
   if(o.plan&&Array.isArray(o.plan.days))o.plan.days.forEach(d=>(d.ex||[]).forEach(e=>{const a=IMP_ALIAS[e.id];if(a){e.id=a.id;if(a.lo&&e.lo==null){e.lo=a.lo;e.hi=a.hi}}}));
   o._alias=true;
 }
-/* deduce la rutina del historial: para cada día, los ejercicios de su última sesión, en orden, y las series más habituales */
+/* deduce la rutina del historial: para cada día, los ejercicios que aparecen en al menos el 40 % de sus sesiones
+   (así un ejercicio saltado un día no se pierde y uno hecho de forma puntual no se cuela), en su orden habitual */
 function inferPlan(o,done){
   const byDay={};
   done.forEach(d=>{const s=o.sess[d],n=Math.round(Number(s.day));if(!(n>=1&&n<=6))return;(byDay[n]=byDay[n]||[]).push(d)});
   const days=Object.keys(byDay).map(Number).sort((a,b)=>a-b);
   if(!days.length)return null;
+  const filled=(d,id)=>((o.sess[d].ex||{})[id]||[]).filter(x=>x&&x.r).length;
   return{src:'nexa',edited:true,prio:days.map((_,i)=>i+1),days:days.map(n=>{
-    const recent=byDay[n].slice(-3),last=o.sess[recent[recent.length-1]].ex;
-    const ids=Object.keys(last).filter(id=>/^[A-Za-z0-9_-]{1,40}$/.test(id)&&Array.isArray(last[id])&&last[id].some(x=>x&&x.r));
+    const list=byDay[n].slice(-10),cnt={},pos={};
+    list.forEach(d=>{const ids=Object.keys(o.sess[d].ex||{}).filter(id=>/^[A-Za-z0-9_-]{1,40}$/.test(id)&&filled(d,id));
+      ids.forEach((id,i)=>{cnt[id]=(cnt[id]||0)+1;(pos[id]=pos[id]||[]).push(ids.length>1?i/(ids.length-1):0)})});
+    const avg=id=>pos[id].reduce((a,b)=>a+b,0)/pos[id].length;
+    const ids=Object.keys(cnt).filter(id=>cnt[id]>=Math.max(1,list.length*.4)).sort((a,b)=>avg(a)-avg(b));
     return{n:'Día '+n,ex:ids.map(id=>{
-      const counts=recent.map(d=>((o.sess[d].ex||{})[id]||[]).filter(x=>x&&x.r).length).filter(Boolean);
+      const counts=list.filter(d=>filled(d,id)).slice(-3).map(d=>filled(d,id));
       const base=EXC[id],steps=counts.length?Math.max(...counts):0;
       const x={id};let sets=base&&base.side?Math.round(steps/2):steps;
       if(base&&!base.side&&!base.seg&&steps===2*base.s){x.side=1;sets=base.s}   // registrado por lados
