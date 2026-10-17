@@ -500,6 +500,7 @@ function impCheck(txt){
   const msg=m=>{const e=$('impMsg');if(e)e.textContent=m};
   let o;try{o=JSON.parse(String(txt).trim())}catch(e){return msg('Ese texto no es una copia válida. Cópiala entera, desde la primera llave hasta la última.')}
   if(!o||typeof o!=='object'||!o.sess||typeof o.sess!=='object')return msg('No encuentro sesiones en esa copia.');
+  impAlias(o);
   const ds=Object.keys(o.sess).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   const done=ds.filter(d=>o.sess[d]&&o.sess[d].ex&&Object.values(o.sess[d].ex).some(a=>Array.isArray(a)&&a.some(x=>x&&x.r)));
   let plan=null,inferred=false;
@@ -516,6 +517,14 @@ function impCheck(txt){
     '<p class="fn l2" style="padding:0 6px">'+(inferred?'Los rangos y descansos son los de cada ejercicio por defecto; con Plus puedes ajustarlos. ':'')+'Tu rutina actual de Tsuyo se sustituye; las sesiones que ya tengas se conservan.</p>'+
     '<button class="btn pri" onclick="impApply()">Importar</button><button class="btn sec" onclick="backSheet()">Cancelar</button></div>'}),true);
 }
+/* nombres de la primera versión de NEXA Fit → catálogo actual */
+const IMP_ALIAS={latmanc:{id:'laterales'},cardio25:{id:'cardio',lo:25,hi:25},cardio15:{id:'cardiof',lo:15,hi:15}};
+function impAlias(o){
+  Object.values(o.sess||{}).forEach(s=>{if(!s||!s.ex)return;const ex={};
+    Object.entries(s.ex).forEach(([id,v])=>{const a=IMP_ALIAS[id];if(a&&!s.ex[a.id]){ex[a.id]=v;if(a.lo)(o._min=o._min||{})[a.id]=a.lo}else ex[id]=v});s.ex=ex});
+  if(o.plan&&Array.isArray(o.plan.days))o.plan.days.forEach(d=>(d.ex||[]).forEach(e=>{const a=IMP_ALIAS[e.id];if(a){e.id=a.id;if(a.lo&&e.lo==null){e.lo=a.lo;e.hi=a.hi}}}));
+  o._alias=true;
+}
 /* deduce la rutina del historial: para cada día, los ejercicios de su última sesión, en orden, y las series más habituales */
 function inferPlan(o,done){
   const byDay={};
@@ -530,7 +539,8 @@ function inferPlan(o,done){
       const base=EXC[id],steps=counts.length?Math.max(...counts):0;
       const x={id};let sets=base&&base.side?Math.round(steps/2):steps;
       if(base&&!base.side&&!base.seg&&steps===2*base.s){x.side=1;sets=base.s}   // registrado por lados
-      if(sets&&base&&sets!==base.s)x.s=Math.min(10,sets);return x})};
+      if(sets&&base&&sets!==base.s)x.s=Math.min(10,sets);
+      const m=(o._min||{})[id];if(m){x.lo=m;x.hi=m}return x})};
   })};
 }
 function impApply(){
