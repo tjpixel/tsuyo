@@ -104,6 +104,11 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .grow{flex:1;min-width:0}
 .topbtn{position:fixed;top:calc(env(safe-area-inset-top) + 8px);z-index:20}
 .topbar-right{right:max(16px,calc(50% - 204px))}
+.topbar-right2{right:max(64px,calc(50% - 156px))}
+.themebtn{color:var(--label)}
+.themebtn svg{transition:transform .45s cubic-bezier(.2,.8,.2,1),opacity .2s}
+.themebtn.spin svg{transform:rotate(-90deg) scale(.6);opacity:0}
+::view-transition-old(root),::view-transition-new(root){animation-duration:.32s}
 
 /* ── cristal ── */
 .glass{
@@ -280,6 +285,7 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 </head>
 <body>
 <div class="app" id="app">
+  <button class="topbtn topbar-right2 avatar glass themebtn" id="btnTheme" onclick="toggleTheme()" hidden></button>
   <button class="topbtn topbar-right avatar glass" id="btnMe" onclick="openMe()" aria-label="Tú: perfil y ajustes" hidden></button>
   <main>
     <section class="view" id="v-hoy" aria-label="Hoy"></section>

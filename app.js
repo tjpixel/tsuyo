@@ -26,6 +26,7 @@ const IC={
   down:'<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
   out:'<path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16l4-4-4-4M14 12H4.5"/>',
   trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>',
+  moon:'<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
   lock:'<rect x="5.5" y="10.5" width="13" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
   user:'<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6"/>',
@@ -63,7 +64,20 @@ async function keepAwake(on){
 }
 
 /* ═════ TEMA ═════ */
-function applyTheme(){document.documentElement.dataset.theme=PREF.get('theme','auto')}
+const DARKQ=matchMedia('(prefers-color-scheme: dark)');
+const isDark=()=>{const t=PREF.get('theme','auto');return t==='dark'||(t==='auto'&&DARKQ.matches)};
+function applyTheme(){
+  const t=PREF.get('theme','auto');document.documentElement.dataset.theme=t;
+  document.querySelectorAll('meta[name=theme-color]').forEach(m=>{m.dataset.c=m.dataset.c||m.content;m.content=t==='auto'?m.dataset.c:(t==='dark'?'#0A0A0C':'#F2F2F6')});
+  const b=$('btnTheme');if(b){const d=isDark();b.innerHTML=ic(d?'sun':'moon',20);b.setAttribute('aria-label',d?'Cambiar a tema claro':'Cambiar a tema oscuro')}
+}
+/* botón siempre a mano: alterna claro/oscuro; «Automática» sigue en Tú → Apariencia */
+function toggleTheme(){
+  const go=()=>{PREF.set('theme',isDark()?'light':'dark');applyTheme()};
+  const b=$('btnTheme');if(b){b.classList.add('spin');setTimeout(()=>b.classList.remove('spin'),60)}
+  if(document.startViewTransition&&!matchMedia('(prefers-reduced-motion: reduce)').matches)document.startViewTransition(go);else go();
+}
+DARKQ.addEventListener&&DARKQ.addEventListener('change',applyTheme);
 function setTheme(t){PREF.set('theme',t);applyTheme();openSheet(meSheet,true)}
 
 /* ═════ CONSTANCIA Y CINTURÓN ═════ */
@@ -591,7 +605,7 @@ function openPlus(){
 /* ═════ BIENVENIDA Y CUENTA ═════ */
 let started=false;
 function showWelcome(){
-  $('tabbar').hidden=true;$('btnMe').hidden=true;$('acc').hidden=true;
+  $('tabbar').hidden=true;$('btnMe').hidden=true;$('btnTheme').hidden=true;$('acc').hidden=true;
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
   $('welcome').innerHTML='<div class="fullin" style="justify-content:space-between">'+
     '<div style="display:flex;flex-direction:column;align-items:center;padding-top:8vh">'+dkStage('rei',3.6)+
@@ -919,7 +933,7 @@ function renderAcc(){
 
 /* ═════ ARRANQUE ═════ */
 function showApp(){
-  $('welcome').classList.remove('on');$('tabbar').hidden=false;$('btnMe').hidden=false;
+  $('welcome').classList.remove('on');$('tabbar').hidden=false;$('btnMe').hidden=false;$('btnTheme').hidden=false;applyTheme();
 }
 async function startApp(localDB){
   started=true;load();
