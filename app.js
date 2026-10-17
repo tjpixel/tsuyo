@@ -500,7 +500,7 @@ function impCheck(txt){
   const msg=m=>{const e=$('impMsg');if(e)e.textContent=m};
   let o;try{o=JSON.parse(String(txt).trim())}catch(e){return msg('Ese texto no es una copia válida. Cópiala entera, desde la primera llave hasta la última.')}
   if(!o||typeof o!=='object'||!o.sess||typeof o.sess!=='object')return msg('No encuentro sesiones en esa copia.');
-  impAlias(o);
+  impAlias(o);const fixes=impClean(o);
   const ds=Object.keys(o.sess).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
   const done=ds.filter(d=>o.sess[d]&&o.sess[d].ex&&Object.values(o.sess[d].ex).some(a=>Array.isArray(a)&&a.some(x=>x&&x.r)));
   let plan=null,inferred=false;
@@ -513,9 +513,19 @@ function impCheck(txt){
     '<div class="card" style="padding:14px 16px"><p class="hl">'+done.length+' sesiones</p><p class="fn l2">'+(done.length?'Del '+fmtD(done[0])+' al '+fmtD(done[done.length-1]):'Sin entrenos registrados')+(o.cfg&&o.cfg.start?' · bloque iniciado el '+fmtD(o.cfg.start):'')+'</p></div>'+
     '<p class="ghead" style="padding-left:16px;margin-bottom:-4px">'+(inferred?'Rutina deducida de tu historial':'Rutina de la copia')+'</p>'+
     plan.days.map((d,i)=>'<div class="card" style="padding:12px 16px"><p class="hl">'+esc(d.n)+'</p><p class="fn l2" style="margin-top:3px">'+d.ex.map(e=>esc((EXC[e.id]||(o.cex||{})[e.id]||{n:e.id}).n)+(e.s?' ('+e.s+(e.side?' por lado':'')+')':(e.side?' (por lado)':''))).join(' · ')+'</p></div>').join('')+
-    (unknown.length?'<div class="note">Hay ejercicios que Tsuyo no conoce: '+unknown.map(esc).join(', ')+'. Se añadirán como ejercicios propios.</div>':'')+
+    (fixes.length?'<div class="note">He descartado '+(fixes.length===1?'un valor imposible':fixes.length+' valores imposibles')+': '+fixes.slice(0,3).map(esc).join(' · ')+(fixes.length>3?'…':'')+'.</div>':'')+(unknown.length?'<div class="note">Hay ejercicios que Tsuyo no conoce: '+unknown.map(esc).join(', ')+'. Se añadirán como ejercicios propios.</div>':'')+
     '<p class="fn l2" style="padding:0 6px">'+(inferred?'Los rangos y descansos son los de cada ejercicio por defecto; con Plus puedes ajustarlos. ':'')+'Tu rutina actual de Tsuyo se sustituye; las sesiones que ya tengas se conservan.</p>'+
     '<button class="btn pri" onclick="impApply()">Importar</button><button class="btn sec" onclick="backSheet()">Cancelar</button></div>'}),true);
+}
+/* descarta pesos, repeticiones o velocidades imposibles (errores de tecleo): muy por encima de lo habitual en ese ejercicio */
+function impClean(o){
+  const vals={},fixes=[],med=a=>{const b=[...a].sort((x,y)=>x-y);return b[Math.floor(b.length/2)]};
+  const each=f=>Object.entries(o.sess||{}).forEach(([d,s])=>s&&s.ex&&Object.entries(s.ex).forEach(([id,sets])=>Array.isArray(sets)&&sets.forEach(x=>x&&f(d,id,x))));
+  each((d,id,x)=>['w','r','sp'].forEach(k=>{const v=Number(x[k]);if(v>0)((vals[id]=vals[id]||{})[k]=vals[id][k]||[]).push(v)}));
+  const nm=id=>(EXC[id]||(o.cex||{})[id]||{n:id}).n,cap={w:500,r:600,sp:30},unit={w:' kg',r:' reps',sp:' km/h'};
+  each((d,id,x)=>['w','r','sp'].forEach(k=>{if(x[k]==null)return;const v=Number(x[k]),m=med((vals[id]||{})[k]||[v]);
+    if(!isFinite(v)||v<0||v>cap[k]||(m>0&&v>m*3&&v-m>=10)){fixes.push(String(x[k]).slice(0,8)+unit[k]+' en '+nm(id)+' ('+fmtD(d)+')');delete x[k]}}));
+  return fixes;
 }
 /* nombres de la primera versión de NEXA Fit → catálogo actual */
 const IMP_ALIAS={latmanc:{id:'laterales'},cardio25:{id:'cardio',lo:25,hi:25},cardio15:{id:'cardiof',lo:15,hi:15}};
