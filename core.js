@@ -366,6 +366,13 @@ function lastFor(id){
   for(const k of ks){if(k===curDate)continue;const r=hit(k);if(r)return r}
   return null;
 }
+/* repeticiones de la última vez; en ejercicios por lados se agrupan izquierda/derecha para no parecer el doble de series */
+function repsTxt(e,sets){
+  const d=(sets||[]).filter(x=>x&&x.r);if(!e.side)return d.map(x=>x.r).join(', ');
+  const pr=[];for(let i=0;i<sets.length;i+=2){const a=sets[i]&&sets[i].r,b=sets[i+1]&&sets[i+1].r;if(a||b)pr.push([a||0,b||0])}
+  if(pr.length&&pr.every(p=>p[0]===pr[0][0]&&p[1]===pr[0][0]))return pr[0][0]+' por lado'+(pr.length>1?' en las '+pr.length+' series':'');
+  return pr.map(p=>p[0]+'/'+p[1]).join(', ')+' (izq./dcha.)';
+}
 function advise(e){
   const L=lastFor(e.id);
   const u=e.seg?(e.min?'min':'seg'):'reps';
@@ -383,20 +390,20 @@ function advise(e){
   }
   if(e.spd){
     const sp=done.map(x=>x.sp).filter(x=>x);
-    if(!sp.length)return{txt:'Última vez: '+done.map(x=>x.r).join(', ')+' min. Anota la velocidad para poder progresar.',up:false,w:''};
+    if(!sp.length)return{txt:'Última vez: '+repsTxt(e,L.sets)+' min. Anota la velocidad para poder progresar.',up:false,w:''};
     return{txt:'Última vez '+Math.max(...sp)+' km/h durante '+done[0].r+' min. <b>Sube la velocidad, no los minutos.</b>',up:false,w:''};
   }
   if(e.bw){
     if(allTop)return{txt:'Techo alcanzado. '+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
-    return{txt:'Última vez: '+done.map(x=>x.r).join(', ')+'. Peso corporal — suma repeticiones.',up:false,w:''};
+    return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Peso corporal — suma repeticiones.',up:false,w:''};
   }
   if(e.opt&&!mx){
     if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};
-    return{txt:'Última vez sin peso → '+done.map(x=>x.r).join(', ')+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
+    return{txt:'Última vez sin peso → '+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
   }
   if(allTop&&e.inc>0)return{txt:'Techo alcanzado. Sube a <b>'+(mx+e.inc)+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:mx+e.inc};
-  if(e.inc===0)return{txt:'Última vez: '+done.map(x=>x.r).join(', ')+'. Suma '+u+'.',up:false,w:''};
-  return{txt:'Última vez '+mx+' kg → '+done.map(x=>x.r).join(', ')+'. Mantén peso y suma '+u+'.',up:false,w:mx};
+  if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+u+'.',up:false,w:''};
+  return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
 }
 
 function prData(){

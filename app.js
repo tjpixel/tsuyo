@@ -771,13 +771,12 @@ function renderSession(){
   if(!SS.on)return;
   const p=PLAN[SS.day],box=$('session');let h='';
   if(SS.ph==='done'){renderDone();return}
-  const e=curEx(),u=unitOf(e),side=e.side?(SS.si%2?' · lado derecho':' · lado izquierdo'):'',setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
-  const setp='<span class="setp" aria-hidden="true">'+Array.from({length:e.s},(_,i)=>'<i class="'+(i<setN-1?'on':(i===setN-1?'now':''))+'"></i>').join('')+'</span>';
+  const e=curEx(),u=unitOf(e),side=e.side?(SS.si%2?' · Derecha':' · Izquierda'):'',setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
   const top=sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>'+(SS.ph==='set'&&SS.bg?restPill():'');
   if(SS.ph==='set'){
     const a=advise(e);
-    h=top+'<p class="fn l2" style="margin-top:22px">Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'</p><h1 class="lt balance" style="margin-top:2px">'+esc(e.n)+'</h1>'+
-      '<div class="row" style="margin-top:10px;gap:12px"><span class="hl">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></span>'+setp+'<span class="grow"></span>'+
+    h=top+'<h1 class="lt balance" style="margin-top:26px">'+esc(e.n)+'</h1>'+
+      '<div class="row" style="margin-top:10px;gap:12px"><span class="hl" style="white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></span><span class="grow"></span>'+
       (e.k&&e.k.length?'<button class="pill" style="height:32px;padding:0 12px;border-radius:16px;background:var(--fill2);color:var(--label);font-size:13px" onclick="openExSheet('+SS.day+','+SS.ei+')">'+ic('book',15)+'Técnica</button>':'')+'</div>'+
       '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start">'+(a.up?'<span class="ic tint" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('up',18,2.6)+'</span>':'<span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('chart',17)+'</span>')+
       '<p class="sb grow">'+a.txt+'</p></div>';
@@ -795,11 +794,11 @@ function renderSession(){
     }else{
       if(SS.w==null)SS.w=defaultW(e);
       const tgt=e.lo===e.hi?e.hi:e.lo+'–'+e.hi;
-      h+=(e.bw?'<div class="center" style="margin-top:34px"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
-        :'<div style="display:flex;flex-direction:column;align-items:center;margin-top:30px"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
+      h+=(e.bw?'<div class="center" style="margin-top:auto;padding-top:28px"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
+        :'<div style="display:flex;flex-direction:column;align-items:center;margin-top:auto;padding-top:28px"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
           '<button class="step" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
-          '<button class="step" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div><p class="fn l2" style="margin-top:8px">Saltos de '+(e.inc||2.5)+' kg</p></div>')+
-        '<div class="chips3" style="margin-top:28px"><div><p class="c1 l2">Objetivo</p><p class="hl num">'+tgt+' '+u+'</p></div><div><p class="c1 l2">Descanso</p><p class="hl num">'+mmss(e.r)+'</p></div><div><p class="c1 l2">En recámara</p><p class="hl num">'+rirHint()+'</p></div></div>'+
+          '<button class="step" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>')+
+        '<p class="sb l2 center num" style="margin-top:18px">'+(e.bw?'':'<span class="semi" style="color:var(--label)">'+tgt+' '+u+(e.side?' por lado':'')+'</span> · ')+'deja '+rirHint()+' en recámara</p>'+
         '<div class="foot"><button class="btn pri lg" onclick="doneSet()">'+ic('check',22,2.6)+'Serie hecha</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
     }
   }else if(SS.ph==='rest'){
