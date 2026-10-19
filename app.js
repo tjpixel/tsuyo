@@ -832,7 +832,8 @@ function fitW(el){
   let fs=parseFloat(cs.fontSize);const txt=el.value||el.placeholder||'0';
   const meas=()=>{x.font=cs.fontWeight+' '+fs+'px '+cs.fontFamily;return x.measureText(txt).width+(txt.length-1)*parseFloat(cs.letterSpacing||0)};
   let w=meas();while(w>150&&fs>40){fs-=4;w=meas()}
-  el.style.fontSize=fs+'px';el.style.width=Math.ceil(w+6)+'px';
+  el.style.fontSize=fs+'px';el.style.width=Math.ceil(w+fs*.16+4)+'px';   // margen: el lienzo no aplica cifras tabulares ni el redondeo del glifo
+  if(!fitW.ready&&document.fonts&&document.fonts.ready){fitW.ready=1;document.fonts.ready.then(()=>fitW($('ssW')))}
 }
 function adjW(d){const e=curEx(),inc=e.inc||2.5;SS.w=Math.max(0,Math.round(((SS.w==null?0:SS.w)+d*inc)*100)/100);const el=$('ssW');if(el){el.value=SS.w;fitW(el)}}
 function nextLabel(){
