@@ -717,7 +717,7 @@ function finishOnb(){
 }
 
 /* ═════ SESIÓN GUIADA ═════ */
-const SS={on:false,min:false,day:0,ei:0,si:0,ph:'set',t0:0,tEnd:0,tTot:0,tI:null,ann:null,last:0,R0:null,w:null,wOn:false,wStart:0,mins:null,sp:null};
+const SS={bg:false,on:false,min:false,day:0,ei:0,si:0,ph:'set',t0:0,tEnd:0,tTot:0,tI:null,ann:null,last:0,R0:null,w:null,wOn:false,wStart:0,mins:null,sp:null};
 const EFF={
   rir:[[3,'Fácil','3+ de sobra'],[2,'Bien','1–2 de sobra'],[0,'Al límite','Ni una más']],
   rpe:[[7,'Fácil','Aguantaba más'],[8,'Bien','Quedaban 10–15 s'],[10,'Al límite','Ni un segundo más']],
@@ -727,7 +727,7 @@ const effKind=e=>e.spd?'car':(e.seg?'rpe':'rir');
 function openSession(day){
   if(SS.on&&SS.day===day){expandSession();return}
   const p=PLAN[day],log=DB.sess[T()]?.ex||{};
-  SS.on=true;SS.min=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
+  SS.on=true;SS.min=false;SS.bg=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
   let found=false;
   outer:for(let i=0;i<p.ex.length;i++){const e=p.ex[i],s=log[e.id]||[];for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r)){SS.ei=i;SS.si=j;found=true;break outer}}
   const st=PREF.get('sess',null);
@@ -773,7 +773,7 @@ function renderSession(){
   if(SS.ph==='done'){renderDone();return}
   const e=curEx(),u=unitOf(e),side=e.side?(SS.si%2?' · lado derecho':' · lado izquierdo'):'',setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
   const setp='<span class="setp" aria-hidden="true">'+Array.from({length:e.s},(_,i)=>'<i class="'+(i<setN-1?'on':(i===setN-1?'now':''))+'"></i>').join('')+'</span>';
-  const top=sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>';
+  const top=sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>'+(SS.ph==='set'&&SS.bg?restPill():'');
   if(SS.ph==='set'){
     const a=advise(e);
     h=top+'<p class="fn l2" style="margin-top:22px">Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'</p><h1 class="lt balance" style="margin-top:2px">'+esc(e.n)+'</h1>'+
@@ -797,7 +797,7 @@ function renderSession(){
       const tgt=e.lo===e.hi?e.hi:e.lo+'–'+e.hi;
       h+=(e.bw?'<div class="center" style="margin-top:34px"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
         :'<div style="display:flex;flex-direction:column;align-items:center;margin-top:30px"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
-          '<button class="step" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value)" aria-label="Kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
+          '<button class="step" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
           '<button class="step" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div><p class="fn l2" style="margin-top:8px">Saltos de '+(e.inc||2.5)+' kg</p></div>')+
         '<div class="chips3" style="margin-top:28px"><div><p class="c1 l2">Objetivo</p><p class="hl num">'+tgt+' '+u+'</p></div><div><p class="c1 l2">Descanso</p><p class="hl num">'+mmss(e.r)+'</p></div><div><p class="c1 l2">En recámara</p><p class="hl num">'+rirHint()+'</p></div></div>'+
         '<div class="foot"><button class="btn pri lg" onclick="doneSet()">'+ic('check',22,2.6)+'Serie hecha</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
@@ -813,9 +813,9 @@ function renderSession(){
       '<circle id="rArc" cx="88" cy="88" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(SS.last?0:-C*(1-(SS.tTot?L/SS.tTot:0)))+'"/></svg>'+
       '<div class="in">'+(SS.last?'<span style="color:var(--ink)">'+ic('check',54,3)+'</span>':'<span class="rnd num bold" style="font-size:50px;line-height:56px" id="rT">'+mmss(Math.ceil(L))+'</span><span class="fn l2 num">de '+mmss(SS.tTot)+'</span>')+'</div></div></div>'+
       (SS.last?'':'<div class="row" style="justify-content:center;gap:10px;margin-top:20px"><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="addRest(30)">+30 s</button><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="endRest()">Saltar descanso</button></div>')+
-      '<div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,nx):'')+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
+      '<div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,prepOK()?null:nx):'')+prepBtn()+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
   }
-  box.innerHTML='<div class="fullin">'+h+'</div>';
+  box.innerHTML='<div class="fullin">'+h+'</div>';fitW($('ssW'));
 }
 function stepper(lbl,val,unit,id,step){
   return '<div class="card row" style="padding:10px 10px 10px 18px"><span class="bd grow">'+lbl+'</span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\',-'+step+')" aria-label="Menos">'+ic('minus',16,2.4)+'</button>'+
@@ -826,12 +826,47 @@ function adjV(id,d){
   if(id==='ssSp')SS.sp=Math.max(0,Math.round(((SS.sp||0)+d)*10)/10);
   const el=$(id);if(el)el.textContent=id==='ssMin'?SS.mins:SS.sp;
 }
-function adjW(d){const e=curEx(),inc=e.inc||2.5;SS.w=Math.max(0,Math.round(((SS.w==null?0:SS.w)+d*inc)*100)/100);const el=$('ssW');if(el)el.value=SS.w}
+/* el campo de peso crece con la cifra para que «42,5» no pise los «kg» */
+let _cv;
+function fitW(el){
+  if(!el)return;el.style.fontSize='';const cs=getComputedStyle(el);_cv=_cv||document.createElement('canvas');const x=_cv.getContext('2d');
+  let fs=parseFloat(cs.fontSize);const txt=el.value||el.placeholder||'0';
+  const meas=()=>{x.font=cs.fontWeight+' '+fs+'px '+cs.fontFamily;return x.measureText(txt).width+(txt.length-1)*parseFloat(cs.letterSpacing||0)};
+  let w=meas();while(w>150&&fs>40){fs-=4;w=meas()}
+  el.style.fontSize=fs+'px';el.style.width=Math.ceil(w+6)+'px';
+}
+function adjW(d){const e=curEx(),inc=e.inc||2.5;SS.w=Math.max(0,Math.round(((SS.w==null?0:SS.w)+d*inc)*100)/100);const el=$('ssW');if(el){el.value=SS.w;fitW(el)}}
 function nextLabel(){
   const p=PLAN[SS.day],e=curEx();
   if(SS.last)return null;
   if(SS.si<nSteps(e)-1){const n=e.side?Math.floor((SS.si+1)/2)+1:SS.si+2;return (e.side&&SS.si%2===0?'Lado derecho':'Serie '+n+' de '+e.s)+(e.bw||e.seg?'':' · '+(SS.w==null?'—':SS.w)+' kg')}
   const ne=p.ex[SS.ei+1];return ne?esc(ne.n):null;
+}
+/* Preparar la siguiente máquina: al acabar un ejercicio, pasa al siguiente sin cortar el descanso.
+   El descanso sigue en una cápsula arriba (como una Live Activity) y avisa al terminar. */
+function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&SS.ei<p.ex.length-1}
+function prepBtn(){
+  if(!prepOK())return'';const ne=PLAN[SS.day].ex[SS.ei+1];
+  return '<button class="prepbtn" onclick="prepNext()"><span class="pi">'+ic('chevR',18,2.6)+'</span><span class="grow" style="min-width:0"><span class="hl ell" style="display:block">Preparar '+esc(ne.n)+'</span><span class="fn l2" style="display:block">El descanso sigue contando</span></span></button>';
+}
+function prepNext(){
+  if(!prepOK()){endRest();return}
+  const p=PLAN[SS.day];SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null;SS.ph='set';SS.ann=null;SS.sw=false;SS.bg=true;
+  renderSession();renderAcc();
+}
+function restPill(){
+  const L=Math.max(0,(SS.tEnd-Date.now())/1000),C=2*Math.PI*11;
+  return '<div class="restpill" id="bgPill" role="timer" aria-label="Descanso"><div class="ring" style="width:28px;height:28px"><svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><circle cx="14" cy="14" r="11" fill="none" stroke="var(--fill)" stroke-width="3.2"/>'+
+    '<circle id="bgArc" cx="14" cy="14" r="11" fill="none" stroke="var(--tint)" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-L/SS.tTot))+'"/></svg></div>'+
+    '<span class="tt" id="bgT">Descanso · '+mmss(Math.ceil(L))+'</span><button class="add" onclick="addRest(30)" aria-label="Añadir 30 segundos">+30 s</button></div>';
+}
+/* fin del descanso en segundo plano: no se vuelve a pintar la pantalla, para no perder el peso que estés escribiendo */
+function endBgRest(done){
+  SS.bg=false;SS.tEnd=0;const el=$('bgPill');
+  if(el&&done){el.classList.add('end');const t=$('bgT');if(t)t.textContent='Descanso terminado';el.querySelectorAll('button').forEach(b=>b.remove());
+    const r=el.querySelector('.ring');if(r)r.outerHTML='<span style="width:28px;height:28px;display:grid;place-items:center">'+ic('check',18,3)+'</span>';setTimeout(()=>{el.classList.add('gone');setTimeout(()=>el.remove(),400)},2200)}
+  else if(el)el.remove();
+  if(!SS.wOn)stopTimer();renderAcc();
 }
 function annCard(e,A,kind,nx){
   const valTxt=e.spd?(A.r+' min'+(A.sp?' · '+A.sp+' km/h':'')):(e.seg?A.r+' s':null);
@@ -861,7 +896,7 @@ function swToggle(){
   logSet(e,SS.si,{r:el});afterSet(e);
 }
 function afterSet(e){
-  const p=PLAN[SS.day];SS.ann={e,si:SS.si};SS.wOn=false;
+  const p=PLAN[SS.day];SS.ann={e,si:SS.si};SS.wOn=false;SS.bg=false;
   if(SS.si>=nSteps(e)-1&&SS.ei>=p.ex.length-1){SS.last=1;SS.ph='rest';SS.tEnd=0;stopTimer();ding();renderSession();renderAcc();return}
   SS.last=0;const first=e.side&&SS.si%2===0;SS.sw=first;
   const rest=first?20:e.r;
@@ -869,7 +904,7 @@ function afterSet(e){
   else{advance();renderSession();renderAcc()}
 }
 function advance(){
-  const p=PLAN[SS.day],e=curEx();stopTimer();SS.tEnd=0;SS.sw=false;
+  const p=PLAN[SS.day],e=curEx();stopTimer();SS.tEnd=0;SS.sw=false;SS.bg=false;
   if(SS.si<nSteps(e)-1){SS.si++}
   else if(SS.ei<p.ex.length-1){SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null}
   else{SS.ph='done';return}
@@ -882,6 +917,12 @@ function startTick(){stopTimer();SS.tI=setInterval(tick,250);tick()}
 function stopTimer(){clearInterval(SS.tI);SS.tI=null}
 function tick(){
   const c=$('ssClock');if(c)c.textContent=mmss((Date.now()-SS.t0)/1000);
+  if(SS.bg&&SS.tEnd){
+    const L=Math.max(0,(SS.tEnd-Date.now())/1000),t=$('bgT'),a=$('bgArc');
+    if(t)t.textContent='Descanso · '+mmss(Math.ceil(L));if(a){const C=2*Math.PI*11;a.setAttribute('stroke-dashoffset',-C*(1-L/SS.tTot))}
+    if(L<=0){ding();endBgRest(true)}else if(!SS.wOn)renderAcc();
+    if(!SS.wOn)return;
+  }
   if(SS.ph==='set'&&SS.wOn){
     const e=curEx(),el=Math.floor((Date.now()-SS.wStart)/1000),t=$('swT'),a=$('swArc');
     if(t)t.textContent=mmss(el);if(a){const C=2*Math.PI*88;a.setAttribute('stroke-dashoffset',C*(1-Math.min(1,el/e.hi)))}
@@ -895,7 +936,7 @@ function tick(){
   renderAcc();
   if(L<=0){ding();advance();if(!SS.min)renderSession();renderAcc();if(SS.ph==='set'&&!SS.min)keepAwake(true)}
 }
-function finishSession(){stopTimer();SS.ph='done';SS.last=0;renderSession();renderAcc()}
+function finishSession(){stopTimer();SS.bg=false;SS.tEnd=0;SS.ph='done';SS.last=0;renderSession();renderAcc()}
 function renderDone(){
   const d=T(),p=PLAN[SS.day],s=sessStats(d),mins=DB.sess[d]?.dur||Math.max(1,Math.round((Date.now()-SS.t0)/60000));
   const R=prData(),news=Object.keys(R).filter(id=>R[id].d===d&&(SS.R0[id]==null||R[id].v>SS.R0[id]));
@@ -916,7 +957,7 @@ function openSessMenu(){
     '<button class="cell" onclick="closeSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div></div>'}));
 }
 function jumpTo(i){
-  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.ei=i;SS.si=0;
+  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;
   for(let j=0;j<nSteps(e);j++){SS.si=j;if(!(s[j]&&s[j].r))break}
   SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;closeSheet();renderSession();renderAcc();
 }
@@ -924,7 +965,7 @@ function renderAcc(){
   const a=$('acc'),on=SS.on&&SS.min&&started;a.hidden=!on;
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('with-acc',on));
   if(!on)return;
-  const e=curEx(),rest=SS.ph==='rest'&&SS.tEnd,L=rest?Math.max(0,(SS.tEnd-Date.now())/1000):0,C=2*Math.PI*16.5;
+  const e=curEx(),rest=(SS.ph==='rest'||SS.bg)&&SS.tEnd,L=rest?Math.max(0,(SS.tEnd-Date.now())/1000):0,C=2*Math.PI*16.5;
   const pct=rest?L/SS.tTot:(SS.ph==='done'?1:0);
   a.innerHTML='<div class="ring" style="width:40px;height:40px"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="var(--fill)" stroke-width="4"/>'+
     '<circle cx="20" cy="20" r="16.5" fill="none" stroke="var(--tint)" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-pct))+'"/></svg>'+
