@@ -992,6 +992,9 @@ function renderAcc(){
     '<span class="btn sec sm" style="height:38px">'+(rest?'Ver':'Seguir')+'</span>';
 }
 
+/* tamaño bloqueado, como una app: sin pellizcar para ampliar ni doble toque (Safari ignora user-scalable) */
+['gesturestart','gesturechange'].forEach(t=>document.addEventListener(t,e=>e.preventDefault(),{passive:false}));
+document.addEventListener('touchmove',e=>{if(e.touches.length>1)e.preventDefault()},{passive:false});
 /* ═════ ARRANQUE ═════ */
 function showApp(){
   $('welcome').classList.remove('on');$('tabbar').hidden=false;$('btnMe').hidden=false;$('btnTheme').hidden=false;applyTheme();
