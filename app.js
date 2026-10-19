@@ -807,7 +807,7 @@ function renderSession(){
     const nx=nextLabel();
     const R=82,C=2*Math.PI*R,L=SS.tEnd?Math.max(0,(SS.tEnd-Date.now())/1000):0;
     h=top+'<p class="fn l2" style="margin-top:22px">'+(SS.ann?esc(ae.n)+' · serie '+(ae.side?Math.floor(SS.ann.si/2)+1:SS.ann.si+1)+' hecha':'')+'</p><h1 class="lt" style="margin-top:2px">'+(SS.last?'¡Última serie!':(SS.sw?'Cambio de lado':'Descanso'))+'</h1>'+
-      '<div class="row" style="justify-content:center;gap:24px;margin-top:22px">'+'<div style="align-self:flex-end;margin-bottom:12px">'+dkStage(hard?'tired':'seiza',1.75)+'</div>'+
+      '<div class="row" style="justify-content:center;gap:24px;margin-top:22px">'+'<div id="restDk" style="align-self:flex-end;margin-bottom:12px;width:108px;height:150px;display:flex;align-items:flex-end;justify-content:center">'+dkStage(hard?'tired':'seiza',1.75)+'</div>'+
       '<div class="ring" style="width:176px;height:176px"><svg width="176" height="176" viewBox="0 0 176 176" aria-hidden="true"><circle cx="88" cy="88" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
       '<circle id="rArc" cx="88" cy="88" r="'+R+'" fill="none" stroke="'+(SS.last?'var(--tint)':restCol(L))+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(SS.last?0:-C*(1-(SS.tTot?L/SS.tTot:0)))+'"/></svg>'+
       '<div class="in">'+(SS.last?'<span style="color:var(--ink)">'+ic('check',54,3)+'</span>':'<span class="rnd num bold" style="font-size:50px;line-height:56px;color:'+restTxt(L)+'" id="rT">'+mmss(Math.ceil(L))+'</span><span class="fn l2 num" id="rL">'+(L<=10?'Prepárate':'de '+mmss(SS.tTot))+'</span>')+'</div></div></div>'+
@@ -883,11 +883,17 @@ function annCard(e,A,kind,nx){
     (valTxt?'<p class="t3 num" style="margin-top:8px">'+valTxt+'</p>'
       :'<div class="row" style="justify-content:space-between;margin-top:12px;padding:6px 6px 6px 14px;border-radius:22px;background:var(--fill2)"><span class="bd">Repeticiones</span><div class="row" style="gap:12px">'+
       '<button class="mini" onclick="annRep(-1)" aria-label="Una menos">'+ic('minus',18,2.4)+'</button><span class="t2 num" id="annR" style="min-width:30px;text-align:center">'+A.r+'</span><button class="mini" onclick="annRep(1)" aria-label="Una más">'+ic('plus',18,2.4)+'</button></div></div>')+
-    '<p class="fn l2" style="margin:14px 0 8px">¿Cómo ha ido?</p><div class="seg3">'+EFF[kind].map(([v,t,s])=>'<button class="'+(A.rir===v?'on':'')+'" onclick="setEff('+v+')" aria-pressed="'+(A.rir===v)+'"><span class="hl">'+t+'</span><span class="c1 l2">'+s+'</span></button>').join('')+'</div>'+
+    '<p class="fn l2" style="margin:14px 0 8px">¿Cómo ha ido?</p><div class="seg3">'+EFF[kind].map(([v,t,s])=>'<button data-v="'+v+'" class="'+(A.rir===v?'on':'')+'" onclick="setEff('+v+')" aria-pressed="'+(A.rir===v)+'"><span class="hl">'+t+'</span><span class="c1 l2">'+s+'</span></button>').join('')+'</div>'+
     (nx?'<div class="row" style="margin-top:14px;padding-top:12px;border-top:.5px solid var(--sep)"><span class="fn l2 grow">Siguiente</span><span class="fn semi num">'+nx+'</span></div>':'')+'</div>';
 }
 function annRep(d){if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.r=Math.max(0,(A.r||0)+d);save();const el=$('annR');if(el)el.textContent=A.r}
-function setEff(v){if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.rir=A.rir===v?undefined:v;save();renderSession()}
+/* anotar el esfuerzo sin repintar la pantalla: el temporizador no se mueve ni parpadea */
+function setEff(v){
+  if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.rir=A.rir===v?undefined:v;save();
+  document.querySelectorAll('#session .seg3 button').forEach(b=>{const on=+b.dataset.v===A.rir;b.classList.toggle('on',on);b.setAttribute('aria-pressed',on)});
+  const kind=effKind(SS.ann.e),hard=A.rir!=null&&EFF[kind][2][0]===A.rir,box=$('restDk');
+  if(box){const cur=box.querySelector('.deshi'),want=hard?'tired':'seiza';if(!cur||cur.dataset.pose!==want)box.innerHTML=dkStage(want,1.75)}
+}
 function doneSet(){
   const e=curEx();
   if(e.spd){logSet(e,SS.si,{r:SS.mins,sp:SS.sp||undefined})}
