@@ -776,7 +776,7 @@ function renderSession(){
   if(SS.ph==='set'){
     const a=advise(e);
     h=top+'<h1 class="lt balance" style="margin-top:26px">'+esc(e.n)+'</h1>'+
-      '<div class="row" style="margin-top:10px;gap:12px"><span class="hl" style="white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></span><span class="grow"></span>'+
+      '<div class="row" style="margin-top:14px;gap:12px;align-items:center"><div class="grow" style="min-width:0">'+setBar(e,setN)+'<p class="fn l2" style="margin-top:7px;white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></p></div>'+
       (e.k&&e.k.length?'<button class="pill" style="height:32px;padding:0 12px;border-radius:16px;background:var(--fill2);color:var(--label);font-size:13px" onclick="openExSheet('+SS.day+','+SS.ei+')">'+ic('book',15)+'Técnica</button>':'')+'</div>'+
       '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start">'+(a.up?'<span class="ic tint" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('up',18,2.6)+'</span>':'<span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('chart',17)+'</span>')+
       '<p class="sb grow">'+a.txt+'</p></div>';
@@ -794,11 +794,11 @@ function renderSession(){
     }else{
       if(SS.w==null)SS.w=defaultW(e);
       const tgt=e.lo===e.hi?e.hi:e.lo+'–'+e.hi;
-      h+=(e.bw?'<div class="center" style="margin-top:auto;padding-top:28px"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
-        :'<div style="display:flex;flex-direction:column;align-items:center;margin-top:auto;padding-top:28px"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
+      h+='<div style="flex:1 1 0;min-height:24px"></div>'+(e.bw?'<div class="center"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
+        :'<div style="display:flex;flex-direction:column;align-items:center"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
           '<button class="step" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
           '<button class="step" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>')+
-        '<p class="sb l2 center num" style="margin-top:18px">'+(e.bw?'':'<span class="semi" style="color:var(--label)">'+tgt+' '+u+(e.side?' por lado':'')+'</span> · ')+'deja '+rirHint()+' en recámara</p>'+
+        '<p class="sb l2 center num" style="margin-top:18px">'+(e.bw?'':'<span class="semi" style="color:var(--label)">'+tgt+' '+u+(e.side?' por lado':'')+'</span> · ')+'deja '+rirHint()+' en recámara</p><div style="flex:1.7 1 0"></div>'+
         '<div class="foot"><button class="btn pri lg" onclick="doneSet()">'+ic('check',22,2.6)+'Serie hecha</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
     }
   }else if(SS.ph==='rest'){
@@ -815,6 +815,11 @@ function renderSession(){
       '<div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,prepOK()?null:nx):'')+prepBtn()+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
   }
   box.innerHTML='<div class="fullin">'+h+'</div>';fitW($('ssW'));
+}
+/* progreso de series: un tramo por serie; en ejercicios por lados el tramo actual se llena a la mitad tras el primer lado */
+function setBar(e,setN){
+  const half=e.side&&SS.si%2===1;
+  return '<div class="setbar" aria-hidden="true">'+Array.from({length:e.s},(_,i)=>'<i class="'+(i<setN-1?'on':(i===setN-1?(half?'now half':'now'):''))+'"></i>').join('')+'</div>';
 }
 function stepper(lbl,val,unit,id,step){
   return '<div class="card row" style="padding:10px 10px 10px 18px"><span class="bd grow">'+lbl+'</span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\',-'+step+')" aria-label="Menos">'+ic('minus',16,2.4)+'</button>'+
