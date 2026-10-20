@@ -1,5 +1,5 @@
 /* Tsuyo · funciona sin conexión: la app se guarda en el móvil; los datos van aparte */
-const V='tsuyo-v2';
+const V='tsuyo-v3';
 const CORE=['./','index.html','core.js','data.js','app.js','deshi.js','vendor/supabase-2.117.2.js','fonts/syne.woff2','manifest.webmanifest','icons/icon-192.png','icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==V).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});

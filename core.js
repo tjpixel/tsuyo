@@ -400,14 +400,14 @@ function advise(e){
   }
   if(e.bw){
     if(allTop)return{txt:'Techo alcanzado. '+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
-    return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Peso corporal — suma repeticiones.',up:false,w:''};
+    return{txt:'Última vez: '+repsTxt(e,L.sets)+(e.seg?' '+(e.min?'min':'s')+'. Aguanta un poco más cada vez hasta '+e.hi+' '+(e.min?'min':'s')+(e.side?' por lado':'')+' en todas las series.':'. Peso corporal — suma repeticiones.'),up:false,w:''};
   }
   if(e.opt&&!mx){
     if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};
     return{txt:'Última vez sin peso → '+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
   }
   if(allTop&&e.inc>0)return{txt:'Techo alcanzado. Sube a <b>'+(mx+e.inc)+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:mx+e.inc};
-  if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+u+'.',up:false,w:''};
+  if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
   return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
 }
 
