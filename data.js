@@ -83,6 +83,7 @@ function mergeData(loc,rem){
   });
   Object.entries(loc.skips||{}).forEach(([d,v])=>{if(!out.skips[d])out.skips[d]=v});
   Object.entries(loc.cex||{}).forEach(([id,e])=>{if(!out.cex[id])out.cex[id]=e});
+  out.inc=Object.assign({},out.inc||{},loc.inc||{});
   return mergeDefaults(out);
 }
 

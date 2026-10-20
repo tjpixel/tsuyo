@@ -151,6 +151,7 @@ function exResolve(ref){
   const b=exBase(ref.id);if(!b)return null;
   const o=Object.assign({},b,{id:ref.id});
   EDITABLE.forEach(k=>{if(ref[k]!=null)o[k]=ref[k]});
+  const mi=(DB.inc||{})[ref.id];if(mi&&o.inc>0&&!o.bw)o.inc=mi;   // salto real de la máquina/discos del usuario
   if(o.lo>o.hi)o.hi=o.lo;
   return o;
 }
@@ -159,6 +160,7 @@ function planFromTpl(key){
   const t=TPLS[key];
   return{src:key,prio:t.prio.slice(),days:t.d.map(([n,ids])=>({n,ex:ids.map(x=>typeof x==='string'?{id:x}:Object.assign({},x))}))};
 }
+const INC_OPTS=[0.5,1,1.25,2,2.5,3,4,5,6,7,7.5,8,10,12.5,15,20];
 let PLAN={};
 function buildPlan(){
   PLAN={};
@@ -223,7 +225,7 @@ function unskipToday(){
   save();renderHoy();toast('Marca retirada');
 }
 
-function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},sess:{},skips:{},supp:{},diet:{},bodyEnc:null,cfg:{
+function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},sess:{},skips:{},supp:{},diet:{},bodyEnc:null,cfg:{
   start:'',k:2000,p:120,f:65,c:220,avail:[1,3,5],force:null,mods:{diet:false,body:false},supps:[]
 }}}
 function mergeDefaults(o){
@@ -231,7 +233,7 @@ function mergeDefaults(o){
   const r=Object.assign(d,o);
   r.cfg=Object.assign(freshDB().cfg,o.cfg||{});
   r.cfg.mods=Object.assign({diet:false,body:false},(o.cfg||{}).mods||{});
-  ['cex','sess','skips','supp','diet','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
+  ['cex','inc','sess','skips','supp','diet','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
   delete r.body;                                  // las medidas nunca viajan en claro
   return sanitizeDB(r);
 }
@@ -271,6 +273,9 @@ function sanitizeDB(r){
     [['s',1,10],['lo',1,999],['hi',1,999],['r',0,600],['inc',0,50]].forEach(([k,a,b])=>{const v=sNum(e[k],a,b);if(v!=null)o[k]=v});
     if(e.side)o.side=1;if(e.del)o.del=1;out.cex[id]=o;
   });
+  // salto de peso por ejercicio (lo que permite la máquina o los discos de su gimnasio)
+  out.inc={};
+  if(isObj(r.inc))Object.entries(r.inc).slice(0,300).forEach(([id,v])=>{const n=sNum(v,0.5,50);if(RX_ID.test(id)&&n)out.inc[id]=n});
   // sesiones
   out.sess={};
   if(isObj(r.sess))Object.entries(r.sess).forEach(([d,x])=>{

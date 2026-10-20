@@ -354,13 +354,14 @@ function openDaySheet(k){
     '</div>'}),true);
 }
 function openExSheet(k,i){
-  const e=PLAN[k].ex[i],plus=isPlus(),img=IMG[e.id],a=advise(e);
+  const e=PLAN[k].ex[i],plus=isPlus(),img=IMG[e.id];
   const stepRow=(lbl,f,val,unit)=>'<div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">'+lbl+'</span>'+(plus?'<button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+val+unit+'</span><button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button>':'<span class="val num">'+val+unit+'</span>')+'</div></div>';
-  openSheet(()=>{const e=PLAN[k].ex[i];return{title:esc(e.n),body:'<div class="pad stack">'+
+  openSheet(()=>{const e=PLAN[k].ex[i],a=advise(e);return{title:esc(e.n),body:'<div class="pad stack">'+
     '<div class="card" style="padding:14px 16px"><p class="fn l2">Hoy</p><p class="sb" style="margin-top:2px">'+a.txt+'</p>'+(e.tip?'<p class="fn l2" style="margin-top:6px">'+esc(e.tip)+'</p>':'')+'</div>'+
     '<div><p class="ghead" style="padding-left:16px">Ajustes</p><div class="group">'+stepRow('Series','s',e.s,'')+stepRow('Repeticiones mínimas','lo',e.lo,e.seg?(e.min?' min':' s'):'')+stepRow('Repeticiones máximas','hi',e.hi,e.seg?(e.min?' min':' s'):'')+stepRow('Descanso','r',mmss(e.r),'')+'</div>'+
     (plus?'<div class="row" style="margin-top:10px"><button class="btn sec sm grow" onclick="exReset('+k+','+i+')">Valores por defecto</button><button class="btn sec sm grow danger" onclick="exRemove('+k+','+i+')">Quitar de la sesión</button></div>'
       :'<p class="gfoot" style="padding-left:16px">Con <button class="link" onclick="openPlus()">Plus</button> puedes cambiarlos.</p>')+'</div>'+
+    (e.inc>0&&!e.bw?'<div><p class="ghead" style="padding-left:16px">Tu máquina</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio. Ej.: si la placa va 6, 12, 18…, pon 6.</p></div>':'')+
     (e.k&&e.k.length?'<div><p class="ghead" style="padding-left:16px">Técnica</p><div class="card tech" style="padding:14px 16px">'+(img?'<img src="'+img+'" alt="Técnica de '+esc(e.n)+'" loading="lazy" style="margin-bottom:12px">':'')+
       '<ul class="sb" style="padding-left:18px">'+e.k.map(x=>'<li style="margin-top:4px">'+esc(x)+'</li>').join('')+'</ul></div></div>':'')+
     '</div>'}},true);
@@ -372,6 +373,12 @@ function exEdit(k,i,f,d){
   let v=Math.min(lim[1],Math.max(lim[0],(e[f]||0)+d*step));
   ref[f]=v;if(f==='lo'&&v>(ref.hi??e.hi))ref.hi=v;if(f==='hi'&&v<(ref.lo??e.lo))ref.lo=v;
   DB.plan.edited=true;save();buildPlan();openSheet(SHS[SHS.length-1],true,true);
+}
+function incEdit(k,i,d){
+  const e=PLAN[k].ex[i],o=INC_OPTS,b=exBase(e.id);
+  const v=d>0?o.find(x=>x>e.inc):[...o].reverse().find(x=>x<e.inc);if(v==null)return;
+  DB.inc=DB.inc||{};if(b&&v===b.inc)delete DB.inc[e.id];else DB.inc[e.id]=v;
+  save();buildPlan();if(SS.on&&SS.day===k&&SS.ei===i){SS.w=null;renderSession()}openSheet(SHS[SHS.length-1],true,true);
 }
 function exReset(k,i){const ref=planRef(k,i);EDITABLE.forEach(f=>delete ref[f]);save();buildPlan();openSheet(SHS[SHS.length-1],true,true);toast('Valores por defecto')}
 function exRemove(k,i){
@@ -1001,6 +1008,7 @@ function openSessMenu(){
   const p=PLAN[SS.day],log=DB.sess[T()]?.ex||{};
   openSheet(()=>({title:'Sesión',body:'<div class="pad"><p class="ghead" style="padding-left:16px">Ir a un ejercicio</p><div class="group">'+p.ex.map((e,i)=>{const dn=(log[e.id]||[]).filter(x=>x&&x.r).length;
       return '<button class="cell" onclick="jumpTo('+i+')"><span class="exn'+(dn>=nSteps(e)?' done':'')+'">'+(dn>=nSteps(e)?ic('check',14,2.8):(i+1))+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(e.n)+'</p><p class="fn l2">'+dn+' de '+nSteps(e)+' series</p></div>'+(i===SS.ei?'<span class="pill tint">Ahora</span>':'')+'</div></button>'}).join('')+'</div>'+
+    (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio.</p>':''})()+
     '<div class="group" style="margin-top:18px"><button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
     '<button class="cell" onclick="closeSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div></div>'}));
 }
