@@ -31,7 +31,8 @@ const IC={
   lock:'<rect x="5.5" y="10.5" width="13" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
   user:'<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20c1.2-3.8 4-5.6 7.5-5.6s6.3 1.8 7.5 5.6"/>',
   mail:'<rect x="3.5" y="5.5" width="17" height="13" rx="3"/><path d="M4.8 7.4l7.2 5.3 7.2-5.3"/>',
-  skip:'<path d="M5 6l8 6-8 6zM16.5 6v12"/>',stop:'<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>'
+  skip:'<path d="M5 6l8 6-8 6zM16.5 6v12"/>',stop:'<rect x="6.5" y="6.5" width="11" height="11" rx="2"/>',
+  pause:'<rect x="6.5" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor" stroke="none"/><rect x="13.9" y="5.5" width="3.6" height="13" rx="1.2" fill="currentColor" stroke="none"/>'
 };
 const ic=(n,s=20,w=2)=>'<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[n]+'</svg>';
 const $=id=>document.getElementById(id);
@@ -764,7 +765,7 @@ const effKind=e=>e.spd?'car':(e.seg?'rpe':'rir');
 function openSession(day){
   if(SS.on&&SS.day===day){expandSession();return}
   const p=PLAN[day],log=DB.sess[T()]?.ex||{};
-  SS.on=true;SS.min=false;SS.bg=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
+  SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
   let found=false;
   outer:for(let i=0;i<p.ex.length;i++){const e=p.ex[i],s=log[e.id]||[];for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r)){SS.ei=i;SS.si=j;found=true;break outer}}
   const st=PREF.get('sess',null);
@@ -813,14 +814,20 @@ function renderSession(){
   if(SS.ph==='set'){
     const a=advise(e);
     h=top+'<h1 class="lt balance" style="margin-top:26px">'+esc(e.n)+'</h1>'+
-      '<div class="row" style="margin-top:14px;gap:12px;align-items:center"><div class="grow" style="min-width:0">'+setBar(e,setN)+'<p class="fn l2" style="margin-top:7px;white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></p></div>'+
+      '<div class="row" style="margin-top:14px;gap:12px;align-items:center"><div class="grow" style="min-width:0">'+(e.s>1||e.side?setBar(e,setN)+'<p class="fn l2" style="margin-top:7px;white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></p>':'')+'</div>'+
       (e.k&&e.k.length?'<button class="pill" style="height:32px;padding:0 12px;border-radius:16px;background:var(--fill2);color:var(--label);font-size:13px" onclick="openExSheet('+SS.day+','+SS.ei+')">'+ic('book',15)+'Técnica</button>':'')+'</div>'+
       '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start">'+(a.up?'<span class="ic tint" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('up',18,2.6)+'</span>':'<span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('chart',17)+'</span>')+
       '<p class="sb grow">'+a.txt+'</p></div>';
     if(e.spd){
       if(SS.mins==null)SS.mins=e.hi;if(SS.sp==null){const L=lastFor(e.id);SS.sp=L?Math.max(0,...L.sets.map(x=>x&&x.sp||0))||null:null}
-      h+='<div class="stack" style="margin-top:26px;gap:18px">'+stepper('Minutos',SS.mins,'min','ssMin',1)+stepper('Velocidad',SS.sp==null?'—':SS.sp,'km/h','ssSp',.5)+'</div>'+
-        '<div class="foot"><button class="btn pri lg" onclick="doneSet()">'+ic('check',22,2.6)+'Hecho</button><button class="btn tx" onclick="skipSet()">Saltar</button></div>';
+      const el=cEl(),R=80,C=2*Math.PI*R,tg=SS.mins*60,st=SS.wOn?'run':(el>0?'pause':'idle');
+      h+='<div style="display:flex;flex-direction:column;align-items:center;margin-top:22px"><div class="ring" style="width:184px;height:184px"><svg width="184" height="184" viewBox="0 0 184 184" aria-hidden="true"><circle cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
+        '<circle id="cArc" cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C*(1-Math.min(1,el/tg))+'"/></svg>'+
+        '<div class="in"><span class="rnd num bold" style="font-size:48px;line-height:54px" id="cT">'+mmss(el)+'</span><span class="fn l2 num" id="cL">'+cLab(el,tg)+'</span></div></div></div>'+
+        '<div class="stack" style="margin-top:20px;gap:12px">'+stepper('Objetivo',SS.mins,'min','ssMin',1)+stepper('Velocidad',SS.sp==null?'—':SS.sp,'km/h','ssSp',.5)+'</div>'+
+        '<div class="foot">'+(st==='idle'
+          ?'<button class="btn pri lg" onclick="cStart()">'+ic('play',20)+'Empezar</button><button class="btn tx" onclick="doneSet()">Anotar sin cronómetro</button>'
+          :'<button class="btn pri lg" onclick="'+(st==='run'?'cPause()':'cStart()')+'">'+(st==='run'?ic('pause',20)+'Pausa':ic('play',20)+'Seguir')+'</button><button class="btn tx" onclick="cFinish()">Terminar y anotar</button>')+'</div>';
     }else if(e.seg){
       const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0,R=88,C=2*Math.PI*R;
       h+='<div style="display:flex;flex-direction:column;align-items:center;margin-top:26px"><div class="ring" style="width:200px;height:200px"><svg width="200" height="200" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="12"/>'+
@@ -931,6 +938,12 @@ function setEff(v){
   const kind=effKind(SS.ann.e),hard=A.rir!=null&&EFF[kind][2][0]===A.rir,box=$('restDk');
   if(box){const cur=box.querySelector('.deshi'),want=hard?'tired':'seiza';if(!cur||cur.dataset.pose!==want)box.innerHTML=dkStage(want,1.75)}
 }
+/* cardio con cronómetro: cuenta hacia arriba hasta el objetivo (avisa al llegar) y se puede pausar */
+const cEl=()=>Math.floor((SS.wAcc||0)+(SS.wOn?(Date.now()-SS.wStart)/1000:0));
+const cLab=(el,tg)=>el>=tg?'¡Objetivo cumplido!':(SS.wOn||el?'de '+mmss(tg):'objetivo '+mmss(tg));
+function cStart(){SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();renderAcc()}
+function cPause(){SS.wAcc=cEl();SS.wOn=false;stopTimer();renderSession();renderAcc()}
+function cFinish(){const el=cEl();SS.wOn=false;SS.wAcc=0;SS.cDone=false;stopTimer();if(el<30){renderSession();toast('Menos de 30 s: no se anota');return}SS.mins=Math.max(1,Math.round(el/60));doneSet()}
 function doneSet(){
   const e=curEx();
   if(e.spd){logSet(e,SS.si,{r:SS.mins,sp:SS.sp||undefined})}
@@ -958,7 +971,7 @@ function afterSet(e){
 function advance(){
   const p=PLAN[SS.day],e=curEx();stopTimer();SS.tEnd=0;SS.sw=false;SS.bg=false;
   if(SS.si<nSteps(e)-1){SS.si++}
-  else if(SS.ei<p.ex.length-1){SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null}
+  else if(SS.ei<p.ex.length-1){SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false}
   else{SS.ph='done';return}
   SS.ph='set';SS.ann=null;
 }
@@ -975,6 +988,12 @@ function tick(){
     restBuzz(L);
     if(L<=0){ding();endBgRest(true)}else if(!SS.wOn)renderAcc();
     if(!SS.wOn)return;
+  }
+  if(SS.ph==='set'&&SS.wOn&&curEx().spd){
+    const el=cEl(),tg=SS.mins*60,t=$('cT'),a=$('cArc'),l=$('cL');
+    if(t)t.textContent=mmss(el);if(a){const C=2*Math.PI*80;a.setAttribute('stroke-dashoffset',C*(1-Math.min(1,el/tg)))}if(l)l.textContent=cLab(el,tg);
+    if(el>=tg&&!SS.cDone){SS.cDone=true;ding()}
+    renderAcc();return;
   }
   if(SS.ph==='set'&&SS.wOn){
     const e=curEx(),el=Math.floor((Date.now()-SS.wStart)/1000),t=$('swT'),a=$('swArc');
@@ -1015,7 +1034,7 @@ function openSessMenu(){
 function jumpTo(i){
   const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;
   for(let j=0;j<nSteps(e);j++){SS.si=j;if(!(s[j]&&s[j].r))break}
-  SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;closeSheet();renderSession();renderAcc();
+  SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false;SS.wOn=false;closeSheet();renderSession();renderAcc();
 }
 function renderAcc(){
   const a=$('acc'),on=SS.on&&SS.min&&started;a.hidden=!on;
@@ -1026,7 +1045,7 @@ function renderAcc(){
   a.innerHTML='<div class="ring" style="width:40px;height:40px"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="var(--fill)" stroke-width="4"/>'+
     '<circle cx="20" cy="20" r="16.5" fill="none" stroke="'+(rest?restCol(L):'var(--tint)')+'" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-pct))+'"/></svg>'+
     '<div class="in">'+(rest?'':ic(SS.ph==='done'?'check':'play',15))+'</div></div>'+
-    '<div class="grow"><p class="fn semi num">'+(SS.ph==='done'?'Sesión completada':(rest?'Descanso · '+mmss(Math.ceil(L)):(SS.wOn?'Serie en marcha':'Siguiente serie')))+'</p><p class="c1 l2 ell">'+esc(PLAN[SS.day].n)+' · '+esc(e?e.n:'')+'</p></div>'+
+    '<div class="grow"><p class="fn semi num">'+(SS.ph==='done'?'Sesión completada':(rest?'Descanso · '+mmss(Math.ceil(L)):(SS.wOn?(e&&e.spd?'Cardio · '+mmss(cEl()):'Serie en marcha'):(e&&e.spd&&SS.wAcc?'Cardio en pausa · '+mmss(cEl()):'Siguiente serie'))))+'</p><p class="c1 l2 ell">'+esc(PLAN[SS.day].n)+' · '+esc(e?e.n:'')+'</p></div>'+
     '<span class="btn sec sm" style="height:38px">'+(rest?'Ver':'Seguir')+'</span>';
 }
 
