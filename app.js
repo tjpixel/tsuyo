@@ -436,7 +436,7 @@ function drawSheet(){
   sh.classList.add('on');$('scrim').classList.add('on');lockScroll(true);
 }
 function backSheet(){SHS.pop();SHS.length?drawSheet():closeSheet()}
-function closeSheet(){const sh=$('sheet');sh.classList.remove('on','drag');sh.style.transform='';$('scrim').classList.remove('on');$('scrim').style.opacity='';SHS.length=0;delete sh.dataset.k;lockScroll(false)}
+function closeSheet(){const sh=$('sheet');sh.classList.remove('on','drag');sh.style.transform='';$('scrim').classList.remove('on');$('scrim').style.opacity='';SHS.length=0;delete sh.dataset.k;lockScroll(false);if(document.activeElement)document.activeElement.blur()}
 /* con una hoja abierta, la pantalla de detrás no se mueve */
 let LOCKY=null;
 function lockScroll(on){
@@ -444,21 +444,22 @@ function lockScroll(on){
   if(on&&LOCKY==null){LOCKY=window.scrollY;b.style.top=-LOCKY+'px';b.classList.add('locked')}
   else if(!on&&LOCKY!=null){b.classList.remove('locked');b.style.top='';window.scrollTo(0,LOCKY);LOCKY=null}
 }
-/* arrastrar hacia abajo para cerrar, como en iOS: desde la barrita o la cabecera, o desde el contenido si ya está arriba del todo */
+/* arrastrar hacia abajo para cerrar, como en iOS: desde la barrita o la cabecera, o desde el contenido si ya está arriba del todo.
+   Un gesto que empieza de lado (carruseles, selectores) no cuenta. */
 (function(){
-  let y0=0,t0=0,dy=0,on=false,ok=false;
+  let x0=0,y0=0,t0=0,dy=0,on=false,ok=false;
   const sh=()=>$('sheet');
   document.addEventListener('touchstart',e=>{
-    const s=sh();if(!s||!s.classList.contains('on')||!s.contains(e.target)||e.touches.length>1)return;
+    const s=sh();if(!s||!s.classList.contains('on')||!s.contains(e.target)||e.touches.length>1){ok=false;return}
     const body=s.querySelector('.sbody'),inHead=!!e.target.closest('.grabber,.shead')&&!e.target.closest('button');
     ok=inHead||(body&&body.contains(e.target)&&body.scrollTop<=0&&!e.target.closest('input,textarea,select,.seg3,.segc'));
-    y0=e.touches[0].clientY;t0=Date.now();dy=0;on=false;
+    x0=e.touches[0].clientX;y0=e.touches[0].clientY;t0=Date.now();dy=0;on=false;
   },{passive:true});
   document.addEventListener('touchmove',e=>{
-    if(!ok)return;const s=sh();dy=e.touches[0].clientY-y0;
-    if(!on){if(dy>8){on=true;s.classList.add('drag')}else if(dy<-4){ok=false;return}else return}
+    if(!ok||e.touches.length>1)return;const s=sh();dy=e.touches[0].clientY-y0;const dx=e.touches[0].clientX-x0;
+    if(!on){if(Math.abs(dx)>Math.abs(dy)&&Math.abs(dx)>6){ok=false;return}if(dy>8){on=true;s.classList.add('drag')}else if(dy<-4){ok=false;return}else return}
     e.preventDefault();const d=Math.max(0,dy);
-    s.style.transform='translate(-50%,'+(d<0?0:d)+'px)';$('scrim').style.opacity=String(Math.max(0,1-d/(s.offsetHeight||600)));
+    s.style.transform='translate(-50%,'+d+'px)';$('scrim').style.opacity=String(Math.max(0,1-d/(s.offsetHeight||600)));
   },{passive:false});
   document.addEventListener('touchend',()=>{
     if(!on){ok=false;return}
