@@ -756,7 +756,7 @@ function finishOnb(){
 }
 
 /* ═════ SESIÓN GUIADA ═════ */
-const SS={bg:false,on:false,min:false,day:0,ei:0,si:0,ph:'set',t0:0,tEnd:0,tTot:0,tI:null,ann:null,last:0,R0:null,w:null,wOn:false,wStart:0,mins:null,sp:null};
+const SS={bg:false,on:false,min:false,day:0,ei:0,si:0,ph:'set',acc:0,runAt:0,paused:false,pauseAt:0,cI:null,tEnd:0,tTot:0,tI:null,ann:null,last:0,R0:null,w:null,wOn:false,wStart:0,mins:null,sp:null};
 const EFF={
   rir:[[3,'Fácil','3+ de sobra'],[2,'Bien','1–2 de sobra'],[0,'Al límite','Ni una más']],
   rpe:[[7,'Fácil','Aguantaba más'],[8,'Bien','Quedaban 10–15 s'],[10,'Al límite','Ni un segundo más']],
@@ -769,23 +769,51 @@ function openSession(day){
   SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
   let found=false;
   outer:for(let i=0;i<p.ex.length;i++){const e=p.ex[i],s=log[e.id]||[];for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r)){SS.ei=i;SS.si=j;found=true;break outer}}
-  const st=PREF.get('sess',null);
-  SS.t0=st&&st.d===T()&&st.n===day?st.t:Date.now();PREF.set('sess',{d:T(),n:day,t:SS.t0});
-  SS.R0=st&&st.d===T()&&st.n===day&&st.R0?st.R0:prSnapshot();PREF.set('sess',{d:T(),n:day,t:SS.t0,R0:SS.R0});
+  const st=PREF.get('sess',null),same=st&&st.d===T()&&st.n===day;
+  /* reloj de entrenamiento real: solo cuenta el tiempo entrenando; las pausas no suman y al minimizar sigue contando.
+     Si saliste y vuelves hoy, sigue desde donde lo dejaste (no suma el rato fuera). */
+  SS.acc=same?(st.acc!=null?st.acc:0):0;SS.paused=false;SS.pauseAt=0;
+  SS.runAt=same&&!st.out?(st.acc!=null?st.run:st.t)||0:Date.now();
+  if(same&&!st.out&&st.acc!=null&&!st.run){SS.paused=true;SS.pauseAt=Date.now();SS.runAt=0}
+  SS.R0=same&&st.R0?st.R0:prSnapshot();
   SS.ph=found?'set':'done';
-  $('session').classList.add('on');keepAwake(true);renderSession();renderAcc();
+  if(SS.ph==='done')freezeClock();
+  sessPersist();
+  $('session').classList.add('on');keepAwake(!SS.paused);startClock();renderSession();renderAcc();
+}
+const activeMs=()=>SS.acc+(SS.paused||!SS.runAt?0:Date.now()-SS.runAt);
+const activeMin=()=>Math.max(1,Math.round(activeMs()/60000));
+function sessPersist(out){PREF.set('sess',{d:T(),n:SS.day,R0:SS.R0,acc:SS.acc,run:SS.paused?0:SS.runAt,out:out?1:undefined})}
+/* deja el reloj quieto (pausa, salir o sesión terminada): lo contado pasa a «acc» */
+function freezeClock(){if(SS.runAt){SS.acc=activeMs();SS.runAt=0}}
+function startClock(){clearInterval(SS.cI);SS.cI=setInterval(()=>{const c=$('ssClock');if(c&&!SS.min)c.textContent=mmss(activeMs()/1000)},1000)}
+/* Pausa/Seguir lo congela todo: el reloj de arriba, el descanso (también el de la cápsula) y los cronómetros de cardio y plancha.
+   Al seguir, todo continúa justo donde estaba. */
+function pauseSession(){
+  if(!SS.on||SS.paused||SS.ph==='done')return;
+  SS.acc=activeMs();SS.runAt=0;SS.paused=true;SS.pauseAt=Date.now();stopTimer();
+  sessPersist();closeSheet();keepAwake(false);renderSession();renderAcc();
+}
+function resumeSession(){
+  if(!SS.paused)return;
+  const now=Date.now(),sh=SS.pauseAt?now-SS.pauseAt:0;
+  if(SS.tEnd)SS.tEnd+=sh;if(SS.wOn)SS.wStart+=sh;
+  SS.paused=false;SS.pauseAt=0;SS.runAt=now;SS.prevL=null;
+  sessPersist();if(!SS.min)keepAwake(true);
+  if(SS.tEnd||SS.wOn)startTick();
+  renderSession();renderAcc();
 }
 function prSnapshot(){const R=prData(),o={};Object.keys(R).forEach(k=>o[k]=R[k].v);return o}
 function minimizeSession(){SS.min=true;$('session').classList.remove('on');render()}
 function expandSession(){if(!SS.on)return;SS.min=false;$('session').classList.add('on');renderSession();renderAcc();keepAwake(true)}
 function closeSession(){
-  stopTimer();SS.on=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);PREF.set('sess',null);closeSheet();render();
+  stopTimer();clearInterval(SS.cI);SS.on=false;SS.paused=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);PREF.set('sess',null);closeSheet();render();
 }
 function curEx(){return PLAN[SS.day].ex[SS.ei]}
 function logSet(e,si,val){
   const d=T();DB.sess[d]=DB.sess[d]||{day:SS.day,ex:{}};DB.sess[d].day=SS.day;DB.sess[d].ex[e.id]=DB.sess[d].ex[e.id]||[];
   const prev=DB.sess[d].ex[e.id][si]||{};DB.sess[d].ex[e.id][si]=Object.assign({},prev,val);
-  DB.sess[d].dur=Math.max(1,Math.round((Date.now()-SS.t0)/60000));save();
+  DB.sess[d].dur=activeMin();save();
 }
 const setsFor=e=>DB.sess[T()]?.ex?.[e.id]||[];
 function defaultW(e){
@@ -802,7 +830,7 @@ function defaultR(e){
 function sessDots(){const p=PLAN[SS.day];return '<div class="dots" aria-label="Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'">'+p.ex.map((e,i)=>'<i class="'+(i<SS.ei?'on':(i===SS.ei?'now':''))+'"></i>').join('')+'</div>'}
 function sessHead(){
   return '<div class="fnav"><button class="ibtn glass" onclick="minimizeSession()" aria-label="Minimizar la sesión">'+ic('chevD',22,2.2)+'</button>'+
-    '<div class="center"><p class="fn semi">'+esc(PLAN[SS.day].n)+'</p><p class="c1 l2 num" id="ssClock">'+mmss((Date.now()-SS.t0)/1000)+'</p></div>'+
+    '<div class="center"><p class="fn semi">'+esc(PLAN[SS.day].n)+'</p><p class="c1 l2 num" id="ssClock">'+mmss(activeMs()/1000)+'</p></div>'+
     '<button class="ibtn glass" onclick="openSessMenu()" aria-label="Opciones de la sesión">'+ic('more',22)+'</button></div>';
 }
 function rirHint(){const B=blockInfo();if(!B)return'1–2 reps';if(B.bw===11)return'4 reps';if((B.b===1&&B.bw<=3)||(B.b>1&&B.bw===1))return'3 reps';return'1–2 reps'}
@@ -810,6 +838,7 @@ function renderSession(){
   if(!SS.on)return;
   const p=PLAN[SS.day],box=$('session');let h='';
   if(SS.ph==='done'){renderDone();return}
+  if(SS.paused){renderPaused();return}
   const e=curEx(),u=unitOf(e),side=e.side?(SS.si%2?' · Derecha':' · Izquierda'):'',setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
   const top=sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>'+(SS.ph==='set'&&SS.bg?restPill():'');
   if(SS.ph==='set'){
@@ -982,7 +1011,8 @@ function endRest(){advance();renderSession();renderAcc()}
 function startTick(){stopTimer();SS.tI=setInterval(tick,250);tick()}
 function stopTimer(){clearInterval(SS.tI);SS.tI=null}
 function tick(){
-  const c=$('ssClock');if(c)c.textContent=mmss((Date.now()-SS.t0)/1000);
+  if(SS.paused)return;
+  const c=$('ssClock');if(c)c.textContent=mmss(activeMs()/1000);
   if(SS.bg&&SS.tEnd){
     const L=Math.max(0,(SS.tEnd-Date.now())/1000),t=$('bgT'),a=$('bgArc');
     if(t){t.textContent=(L<=10?'Prepárate · ':'Descanso · ')+mmss(Math.ceil(L));t.style.color=restTxt(L)}if(a){const C=2*Math.PI*11;a.setAttribute('stroke-dashoffset',-C*(1-L/SS.tTot));a.setAttribute('stroke',restCol(L))}
@@ -1011,9 +1041,32 @@ function tick(){
   renderAcc();
   if(L<=0){ding();advance();if(!SS.min)renderSession();renderAcc();if(SS.ph==='set'&&!SS.min)keepAwake(true)}
 }
-function finishSession(){stopTimer();SS.bg=false;SS.tEnd=0;SS.ph='done';SS.last=0;renderSession();renderAcc()}
+/* pantalla de pausa: todo quieto; «Seguir» en lima, como en Neiro */
+function pausedWhat(){
+  const e=curEx();if(!e)return'';
+  if(SS.ph==='rest'&&SS.tEnd)return 'Descanso · quedan '+mmss(Math.ceil(Math.max(0,(SS.tEnd-SS.pauseAt)/1000)));
+  if(SS.ph==='rest'&&SS.last)return 'Última serie hecha';
+  const setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
+  if(e.spd&&(SS.wOn||SS.wAcc))return esc(e.n)+' · '+mmss(cEl())+' de cardio';
+  if(e.seg&&SS.wOn)return esc(e.n)+' · '+mmss(Math.floor((SS.pauseAt-SS.wStart)/1000));
+  return esc(e.n)+' · serie '+setN+' de '+e.s;
+}
+function renderPaused(){
+  const bg=SS.bg&&SS.tEnd?'<p class="fn l2 center num" style="margin-top:6px">Descanso en marcha · quedan '+mmss(Math.ceil(Math.max(0,(SS.tEnd-SS.pauseAt)/1000)))+'</p>':'';
+  $('session').innerHTML='<div class="fullin">'+sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>'+
+    '<div style="flex:1 1 0;min-height:24px"></div><div style="display:flex;justify-content:center">'+dkStage('seiza',2)+'</div>'+
+    '<h1 class="lt center" style="margin-top:22px">En pausa</h1><p class="sb l2 center num" style="margin-top:6px">'+pausedWhat()+'</p>'+bg+
+    '<p class="fn l3 center" style="margin-top:14px">El reloj y el descanso están detenidos.<br>Este rato no cuenta como entrenamiento.</p>'+
+    '<div style="flex:1.3 1 0"></div><div class="foot"><button class="btn pri lg" onclick="resumeSession()">'+ic('play',20)+'Seguir</button><button class="btn tx" onclick="finishSession()">Terminar la sesión</button></div></div>';
+}
+/* salir sin terminar: lo anotado se guarda y el reloj se queda donde estaba; al volver hoy, sigue desde ahí */
+function exitSession(){freezeClock();SS.paused=false;sessPersist(true);stopTimer();clearInterval(SS.cI);SS.on=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);closeSheet();render()}
+function finishSession(){
+  if(SS.paused){const sh=Date.now()-SS.pauseAt;if(SS.tEnd)SS.tEnd+=sh;SS.paused=false;SS.pauseAt=0}
+  freezeClock();const d=T();if(DB.sess[d]){DB.sess[d].dur=activeMin();save()}
+  sessPersist();stopTimer();SS.bg=false;SS.tEnd=0;SS.ph='done';SS.last=0;renderSession();renderAcc()}
 function renderDone(){
-  const d=T(),p=PLAN[SS.day],s=sessStats(d),mins=DB.sess[d]?.dur||Math.max(1,Math.round((Date.now()-SS.t0)/60000));
+  const d=T(),p=PLAN[SS.day],s=sessStats(d),mins=DB.sess[d]?.dur||activeMin();
   const R=prData(),news=Object.keys(R).filter(id=>R[id].d===d&&(SS.R0[id]==null||R[id].v>SS.R0[id]));
   const P=planWeek(),done=Object.keys(P.map).length,nx=nextSession(P);
   $('session').innerHTML='<div class="fullin"><div style="display:flex;justify-content:center;margin-top:28px">'+dkStage('cheer',3)+'</div>'+
@@ -1029,10 +1082,12 @@ function openSessMenu(){
   openSheet(()=>({title:'Sesión',body:'<div class="pad"><p class="ghead" style="padding-left:16px">Ir a un ejercicio</p><div class="group">'+p.ex.map((e,i)=>{const dn=(log[e.id]||[]).filter(x=>x&&x.r).length;
       return '<button class="cell" onclick="jumpTo('+i+')"><span class="exn'+(dn>=nSteps(e)?' done':'')+'">'+(dn>=nSteps(e)?ic('check',14,2.8):(i+1))+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(e.n)+'</p><p class="fn l2">'+dn+' de '+nSteps(e)+' series</p></div>'+(i===SS.ei?'<span class="pill tint">Ahora</span>':'')+'</div></button>'}).join('')+'</div>'+
     (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio.</p>':''})()+
-    '<div class="group" style="margin-top:18px"><button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
-    '<button class="cell" onclick="closeSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div></div>'}));
+    '<div class="group" style="margin-top:18px"><button class="cell" onclick="'+(SS.paused?'closeSheet();resumeSession()':'pauseSession()')+'"><span class="ic soft">'+ic(SS.paused?'play':'pause',16)+'</span><div class="cb"><div class="tt"><p class="bd">'+(SS.paused?'Seguir':'Pausar la sesión')+'</p><p class="fn l2">El reloj y el descanso se detienen</p></div></div></button>'+
+    '<button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
+    '<button class="cell" onclick="exitSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div></div>'}));
 }
 function jumpTo(i){
+  if(SS.paused){SS.paused=false;SS.pauseAt=0;SS.runAt=Date.now();sessPersist();keepAwake(true)}
   const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;
   for(let j=0;j<nSteps(e);j++){SS.si=j;if(!(s[j]&&s[j].r))break}
   SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false;SS.wOn=false;closeSheet();renderSession();renderAcc();
@@ -1041,13 +1096,13 @@ function renderAcc(){
   const a=$('acc'),on=SS.on&&SS.min&&started;a.hidden=!on;
   document.querySelectorAll('.view').forEach(v=>v.classList.toggle('with-acc',on));
   if(!on)return;
-  const e=curEx(),rest=(SS.ph==='rest'||SS.bg)&&SS.tEnd,L=rest?Math.max(0,(SS.tEnd-Date.now())/1000):0,C=2*Math.PI*16.5;
+  const e=curEx(),rest=(SS.ph==='rest'||SS.bg)&&SS.tEnd,L=rest?Math.max(0,(SS.tEnd-(SS.paused?SS.pauseAt:Date.now()))/1000):0,C=2*Math.PI*16.5;
   const pct=rest?L/SS.tTot:(SS.ph==='done'?1:0);
   a.innerHTML='<div class="ring" style="width:40px;height:40px"><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="16.5" fill="none" stroke="var(--fill)" stroke-width="4"/>'+
     '<circle cx="20" cy="20" r="16.5" fill="none" stroke="'+(rest?restCol(L):'var(--tint)')+'" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-pct))+'"/></svg>'+
-    '<div class="in">'+(rest?'':ic(SS.ph==='done'?'check':'play',15))+'</div></div>'+
-    '<div class="grow"><p class="fn semi num">'+(SS.ph==='done'?'Sesión completada':(rest?'Descanso · '+mmss(Math.ceil(L)):(SS.wOn?(e&&e.spd?'Cardio · '+mmss(cEl()):'Serie en marcha'):(e&&e.spd&&SS.wAcc?'Cardio en pausa · '+mmss(cEl()):'Siguiente serie'))))+'</p><p class="c1 l2 ell">'+esc(PLAN[SS.day].n)+' · '+esc(e?e.n:'')+'</p></div>'+
-    '<span class="btn sec sm" style="height:38px">'+(rest?'Ver':'Seguir')+'</span>';
+    '<div class="in">'+(rest&&!SS.paused?'':ic(SS.ph==='done'?'check':(SS.paused?'pause':'play'),15))+'</div></div>'+
+    '<div class="grow"><p class="fn semi num">'+(SS.ph==='done'?'Sesión completada':SS.paused?'En pausa · '+mmss(activeMs()/1000):(rest?'Descanso · '+mmss(Math.ceil(L)):(SS.wOn?(e&&e.spd?'Cardio · '+mmss(cEl()):'Serie en marcha'):(e&&e.spd&&SS.wAcc?'Cardio en pausa · '+mmss(cEl()):'Siguiente serie'))))+'</p><p class="c1 l2 ell">'+esc(PLAN[SS.day].n)+' · '+esc(e?e.n:'')+'</p></div>'+
+    '<span class="btn sec sm" style="height:38px">Abrir</span>';
 }
 
 /* tamaño bloqueado, como una app: sin pellizcar para ampliar ni doble toque (Safari ignora user-scalable) */
@@ -1065,7 +1120,7 @@ async function startApp(localDB){
   if(!(DB.profile&&DB.profile.done)){$('welcome').classList.remove('on');openOnb();return}
   showApp();go('hoy');
   const st=PREF.get('sess',null);
-  if(st&&st.d===T()&&PLAN[st.n]&&setsDoneToday(st.n)<totalSets(st.n)){openSession(st.n);minimizeSession()}
+  if(st&&!st.out&&st.d===T()&&PLAN[st.n]&&setsDoneToday(st.n)<totalSets(st.n)){openSession(st.n);minimizeSession()}
 }
 function boot(){
   applyTheme();
