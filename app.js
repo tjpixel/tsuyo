@@ -852,12 +852,12 @@ function renderSession(){
     const nx=nextLabel();
     const R=82,C=2*Math.PI*R,L=SS.tEnd?Math.max(0,(SS.tEnd-Date.now())/1000):0;
     h=top+'<p class="fn l2" style="margin-top:22px">'+(SS.ann?esc(ae.n)+' · serie '+(ae.side?Math.floor(SS.ann.si/2)+1:SS.ann.si+1)+' hecha':'')+'</p><h1 class="lt" style="margin-top:2px">'+(SS.last?'¡Última serie!':(SS.sw?'Cambio de lado':'Descanso'))+'</h1>'+
-      '<div class="row" style="justify-content:center;gap:24px;margin-top:22px">'+'<div id="restDk" style="align-self:flex-end;margin-bottom:12px;width:108px;height:150px;display:flex;align-items:flex-end;justify-content:center">'+dkStage(hard?'tired':'seiza',1.75)+'</div>'+
+      '<div style="flex:1 1 0;min-height:22px"></div><div class="row" style="justify-content:center;gap:24px">'+'<div id="restDk" style="align-self:flex-end;margin-bottom:12px;width:108px;height:150px;display:flex;align-items:flex-end;justify-content:center">'+dkStage(hard?'tired':'seiza',1.75)+'</div>'+
       '<div class="ring" style="width:176px;height:176px"><svg width="176" height="176" viewBox="0 0 176 176" aria-hidden="true"><circle cx="88" cy="88" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
       '<circle id="rArc" cx="88" cy="88" r="'+R+'" fill="none" stroke="'+(SS.last?'var(--tint)':restCol(L))+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(SS.last?0:-C*(1-(SS.tTot?L/SS.tTot:0)))+'"/></svg>'+
       '<div class="in">'+(SS.last?'<span style="color:var(--ink)">'+ic('check',54,3)+'</span>':'<span class="rnd num bold" style="font-size:50px;line-height:56px;color:'+restTxt(L)+'" id="rT">'+mmss(Math.ceil(L))+'</span><span class="fn l2 num" id="rL">'+(L<=10?'Prepárate':'de '+mmss(SS.tTot))+'</span>')+'</div></div></div>'+
-      (SS.last?'':'<div class="row" style="justify-content:center;gap:10px;margin-top:20px"><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="addRest(30)">+30 s</button><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="endRest()">Saltar descanso</button></div>')+
-      '<div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,prepOK()?null:nx):'')+prepBtn()+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
+      (SS.last?'':'<div class="row" style="justify-content:center;gap:10px;margin-top:44px"><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="addRest(30)">+30 s</button><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="endRest()">Saltar descanso</button></div>')+
+      '<div style="flex:1 1 0;min-height:22px"></div><div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,prepOK()?null:nx):'')+prepBtn()+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
   }
   box.innerHTML='<div class="fullin">'+h+'</div>';fitW($('ssW'));
 }
