@@ -766,7 +766,7 @@ const effKind=e=>e.spd?'car':(e.seg?'rpe':'rir');
 function openSession(day){
   if(SS.on&&SS.day===day){expandSession();return}
   const p=PLAN[day],log=DB.sess[T()]?.ex||{};
-  SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
+  SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.past=[];SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
   let found=false;
   outer:for(let i=0;i<p.ex.length;i++){const e=p.ex[i],s=log[e.id]||[];for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r)){SS.ei=i;SS.si=j;found=true;break outer}}
   const st=PREF.get('sess',null),same=st&&st.d===T()&&st.n===day;
@@ -827,7 +827,13 @@ function defaultR(e){
   if(SS.si>0&&s[SS.si-1]&&s[SS.si-1].r)return s[SS.si-1].r;
   const L=lastFor(e.id),q=L&&L.sets[SS.si];return q&&q.r?q.r:e.lo;
 }
-function sessDots(){const p=PLAN[SS.day];return '<div class="dots" aria-label="Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'">'+p.ex.map((e,i)=>'<i class="'+(i<SS.ei?'on':(i===SS.ei?'now':''))+'"></i>').join('')+'</div>'}
+/* orden libre: si dejas un ejercicio para luego (máquina ocupada), las líneas marcan lo hecho de verdad, no la posición.
+   Un ejercicio cuenta como hecho si tiene todas sus series anotadas o si lo pasaste de largo saltando series. */
+const exDoneAt=i=>{const e=PLAN[SS.day].ex[i],s=setsFor(e);if((SS.past||[]).includes(i))return true;for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r))return false;return true};
+/* siguiente ejercicio pendiente: primero los que vienen detrás; después, los que dejaste atrás */
+function nextPend(){const n=PLAN[SS.day].ex.length;for(let k=1;k<n;k++){const i=(SS.ei+k)%n;if(!exDoneAt(i))return i}return -1}
+function firstStep(i){const e=PLAN[SS.day].ex[i],s=setsFor(e);for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r))return j;return 0}
+function sessDots(){const p=PLAN[SS.day];return '<div class="dots" aria-label="Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'">'+p.ex.map((e,i)=>'<i class="'+(i===SS.ei?'now':(exDoneAt(i)?'on':''))+'"></i>').join('')+'</div>'}
 function sessHead(){
   return '<div class="fnav"><button class="ibtn glass" onclick="minimizeSession()" aria-label="Minimizar la sesión">'+ic('chevD',22,2.2)+'</button>'+
     '<div class="center"><p class="fn semi">'+esc(PLAN[SS.day].n)+'</p><p class="c1 l2 num" id="ssClock">'+mmss(activeMs()/1000)+'</p></div>'+
@@ -919,7 +925,7 @@ function nextLabel(){
   const p=PLAN[SS.day],e=curEx();
   if(SS.last)return null;
   if(SS.si<nSteps(e)-1){const n=e.side?Math.floor((SS.si+1)/2)+1:SS.si+2;return (e.side&&SS.si%2===0?'Lado derecho':'Serie '+n+' de '+e.s)+(e.bw||e.seg?'':' · '+(SS.w==null?'—':SS.w)+' kg')}
-  const ne=p.ex[SS.ei+1];return ne?esc(ne.n):null;
+  const ni=nextPend(),ne=ni<0?null:p.ex[ni];return ne?esc(ne.n):null;
 }
 /* Preparar la siguiente máquina: al acabar un ejercicio, pasa al siguiente sin cortar el descanso.
    El descanso sigue en una cápsula arriba (como una Live Activity) y avisa al terminar. */
@@ -927,14 +933,14 @@ function nextLabel(){
 const restCol=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--warn)':'var(--tint)');
 const restTxt=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--amber)':'');
 function restBuzz(L){const p=SS.prevL;SS.prevL=L;if(p==null)return;if((p>10&&L<=10)||(p>3&&L<=3))try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}}
-function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&SS.ei<p.ex.length-1}
+function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&nextPend()>=0}
 function prepBtn(){
-  if(!prepOK())return'';const ne=PLAN[SS.day].ex[SS.ei+1];
+  if(!prepOK())return'';const ne=PLAN[SS.day].ex[nextPend()];
   return '<button class="prepbtn" onclick="prepNext()"><span class="pi">'+ic('chevR',18,2.6)+'</span><span class="grow" style="min-width:0"><span class="hl ell" style="display:block">Preparar '+esc(ne.n)+'</span><span class="fn l2" style="display:block">El descanso sigue contando</span></span></button>';
 }
 function prepNext(){
   if(!prepOK()){endRest();return}
-  const p=PLAN[SS.day];SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null;SS.ph='set';SS.ann=null;SS.sw=false;SS.bg=true;
+  const ni=nextPend();SS.ei=ni;SS.si=firstStep(ni);SS.w=null;SS.mins=null;SS.sp=null;SS.ph='set';SS.ann=null;SS.sw=false;SS.bg=true;
   renderSession();renderAcc();
 }
 function restPill(){
@@ -992,7 +998,7 @@ function swToggle(){
 }
 function afterSet(e){
   const p=PLAN[SS.day];SS.ann={e,si:SS.si};SS.wOn=false;SS.bg=false;
-  if(SS.si>=nSteps(e)-1&&SS.ei>=p.ex.length-1){SS.last=1;SS.ph='rest';SS.tEnd=0;stopTimer();ding();renderSession();renderAcc();return}
+  if(SS.si>=nSteps(e)-1&&nextPend()<0){SS.last=1;SS.ph='rest';SS.tEnd=0;stopTimer();ding();renderSession();renderAcc();return}
   SS.last=0;const first=e.side&&SS.si%2===0;SS.sw=first;
   const rest=first?20:e.r;
   if(rest>0){SS.prevL=null;SS.ph='rest';SS.tTot=rest;SS.tEnd=Date.now()+rest*1000;startTick();renderSession();renderAcc()}
@@ -1001,11 +1007,11 @@ function afterSet(e){
 function advance(){
   const p=PLAN[SS.day],e=curEx();stopTimer();SS.tEnd=0;SS.sw=false;SS.bg=false;
   if(SS.si<nSteps(e)-1){SS.si++}
-  else if(SS.ei<p.ex.length-1){SS.ei++;SS.si=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false}
+  else if(nextPend()>=0){SS.past=SS.past||[];if(!SS.past.includes(SS.ei))SS.past.push(SS.ei);const ni=nextPend();SS.ei=ni;SS.si=firstStep(ni);SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false}
   else{SS.ph='done';return}
   SS.ph='set';SS.ann=null;
 }
-function skipSet(){const p=PLAN[SS.day],e=curEx();if(SS.si>=nSteps(e)-1&&SS.ei>=p.ex.length-1){finishSession();return}SS.wOn=false;advance();renderSession();renderAcc()}
+function skipSet(){const p=PLAN[SS.day],e=curEx();if(SS.si>=nSteps(e)-1&&nextPend()<0){finishSession();return}SS.wOn=false;advance();renderSession();renderAcc()}
 function addRest(s){SS.tEnd+=s*1000;SS.tTot+=s;SS.prevL=null;tick()}
 function endRest(){advance();renderSession();renderAcc()}
 function startTick(){stopTimer();SS.tI=setInterval(tick,250);tick()}
