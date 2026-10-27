@@ -378,6 +378,10 @@ function repsTxt(e,sets){
   if(pr.length&&pr.every(p=>p[0]===pr[0][0]&&p[1]===pr[0][0]))return pr[0][0]+' por lado'+(pr.length>1?' en las '+pr.length+' series':'');
   return pr.map(p=>p[0]+'/'+p[1]).join(', ')+' (izq./dcha.)';
 }
+/* peso que existe en la máquina: múltiplo del salto (placa 6 → 6, 12, 18…) */
+const r2=x=>Math.round(x*100)/100;
+function snapW(w,inc){if(!(inc>0)||!(w>0))return w;return r2(Math.max(inc,Math.round(w/inc)*inc))}
+const offStep=(w,inc)=>inc>0&&w>0&&Math.abs(w/inc-Math.round(w/inc))>1e-6;
 function advise(e){
   const L=lastFor(e.id);
   const u=e.seg?(e.min?'min':'seg'):'reps';
@@ -406,8 +410,9 @@ function advise(e){
     if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};
     return{txt:'Última vez sin peso → '+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
   }
-  if(allTop&&e.inc>0)return{txt:'Techo alcanzado. Sube a <b>'+(mx+e.inc)+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:mx+e.inc};
+  if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:'Techo alcanzado. Sube a <b>'+nw+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
   if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
+  if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',',')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
   return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
 }
 

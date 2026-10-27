@@ -920,7 +920,7 @@ function fitW(el){
   el.style.fontSize=fs+'px';el.style.width=Math.ceil(w+fs*.16+4)+'px';   // margen: el lienzo no aplica cifras tabulares ni el redondeo del glifo
   if(!fitW.ready&&document.fonts&&document.fonts.ready){fitW.ready=1;document.fonts.ready.then(()=>fitW($('ssW')))}
 }
-function adjW(d){const e=curEx(),inc=e.inc||2.5;SS.w=Math.max(0,Math.round(((SS.w==null?0:SS.w)+d*inc)*100)/100);const el=$('ssW');if(el){el.value=SS.w;fitW(el)}}
+function adjW(d){const e=curEx(),inc=e.inc||2.5,w=SS.w==null?0:SS.w;SS.w=Math.max(0,offStep(w,inc)?r2((d>0?Math.ceil(w/inc):Math.floor(w/inc))*inc):r2(w+d*inc));const el=$('ssW');if(el){el.value=SS.w;fitW(el)}}
 function nextLabel(){
   const p=PLAN[SS.day],e=curEx();
   if(SS.last)return null;
