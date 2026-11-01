@@ -25,7 +25,7 @@ const IC={
   shield:'<path d="M12 3.5l7 2.6v5.4c0 4.4-3 8-7 9-4-1-7-4.6-7-9V6.1z"/>',
   down:'<path d="M12 4v11M7 10.5l5 5 5-5M5 20h14"/>',
   out:'<path d="M14 4.5h3.5a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2H14M10 16l4-4-4-4M14 12H4.5"/>',
-  trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>',
+  trash:'<path d="M5 7h14M10 7V5h4v2M7 7l1 13h8l1-13"/>',redo:'<path d="M5.5 12a6.5 6.5 0 1 0 2-4.7M5 4.5v3.8h3.8"/>',
   moon:'<path d="M20 14.2A8.2 8.2 0 0 1 9.8 4a8.2 8.2 0 1 0 10.2 10.2z"/>',
   sun:'<circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/>',
   lock:'<rect x="5.5" y="10.5" width="13" height="10" rx="2.5"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/>',
@@ -302,7 +302,14 @@ function openPastSession(d){
   const s=DB.sess[d],p=PLAN[s.day];
   openSheet(()=>({title:fmtD(d),body:'<div class="pad stack">'+Object.entries(s.ex||{}).filter(([,a])=>a.some(x=>x&&x.r)).map(([id,a])=>{const e=exBase(id)||{};
     return '<div class="card" style="padding:14px 16px"><p class="hl">'+esc(exName(id))+'</p><p class="fn l2 num" style="margin-top:4px">'+a.filter(x=>x&&x.r).map(x=>(x.w?x.w+' kg × ':'')+x.r+(e.seg?(e.min?' min':' s'):'')+(x.sp?' · '+x.sp+' km/h':'')).join(' · ')+'</p></div>'}).join('')+
-    (s.dur?'<p class="fn l2 center">'+s.dur+' min'+(p?' · '+esc(p.n):'')+'</p>':'')+'</div>'}),true);
+    (s.dur?'<p class="fn l2 center">'+s.dur+' min'+(p?' · '+esc(p.n):'')+'</p>':'')+
+    '<button class="btn tx danger" style="margin-top:4px" onclick="askDelPast(\''+d+'\')">'+ic('trash',18)+'Borrar este entreno</button></div>'}),true);
+}
+function askDelPast(d){const n=sessStats(d).n;confirmSheet('Borrar este entreno','Se borra'+(n===1?' la serie':'n las '+n+' series')+' del '+longDate(d).replace(/^./,c=>c.toLowerCase())+' y deja de contar en tu progreso y tus récords. <b>No se puede deshacer.</b>','Borrar','delPast(\''+d+'\')',true)}
+function delPast(d){
+  if(SS.on&&d===T()){SS.tEnd=0;closeSession()}
+  const st=PREF.get('sess',null);if(st&&st.d===d)PREF.set('sess',null);
+  delete DB.sess[d];save();closeSheet();render();toast('Entreno borrado');
 }
 function openExChart(id){
   if(!id){
@@ -1089,6 +1096,23 @@ function renderPaused(){
 }
 /* salir sin terminar: lo anotado se guarda y el reloj se queda donde estaba; al volver hoy, sigue desde ahí */
 function exitSession(){freezeClock();SS.paused=false;sessPersist(true);stopTimer();clearInterval(SS.cI);SS.on=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);closeSheet();render()}
+/* empezar de cero o descartar (por ejemplo, si te equivocas de rutina o anotas mal al empezar):
+   se borra lo anotado hoy en esta rutina y el reloj vuelve a cero. Siempre con confirmación. */
+function sessLogged(){const ex=DB.sess[T()]?.ex||{};return PLAN[SS.day].ex.reduce((n,e)=>n+(ex[e.id]||[]).filter(x=>x&&x.r).length,0)}
+const loggedTxt=n=>n?'Se borran '+(n===1?'la serie anotada':'las '+n+' series anotadas')+' hoy en esta rutina. ':'';
+function wipeToday(){
+  const d=T(),s=DB.sess[d];if(!s)return;
+  PLAN[SS.day].ex.forEach(e=>{if(s.ex)delete s.ex[e.id]});
+  if(!s.ex||!Object.keys(s.ex).length)delete DB.sess[d];
+  save();
+}
+function askRestart(){const n=sessLogged();confirmSheet('Empezar de cero',loggedTxt(n)+'El reloj vuelve a 0:00 y empiezas por el primer ejercicio.'+(n?' <b>No se puede deshacer.</b>':''),'Empezar de cero','restartSession()',true)}
+function askDiscard(){const n=sessLogged();confirmSheet('Descartar la sesión',loggedTxt(n)+'La sesión no cuenta en tu semana.'+(n?' <b>No se puede deshacer.</b>':''),'Descartar','discardSession()',true)}
+function restartSession(){
+  const day=SS.day;wipeToday();stopTimer();clearInterval(SS.cI);SS.tEnd=0;SS.on=false;PREF.set('sess',null);closeSheet();
+  openSession(day);toast('Sesión desde cero');
+}
+function discardSession(){wipeToday();SS.tEnd=0;closeSession();toast('Sesión descartada')}
 function finishSession(){
   if(SS.paused){const sh=Date.now()-SS.pauseAt;if(SS.tEnd)SS.tEnd+=sh;SS.paused=false;SS.pauseAt=0}
   freezeClock();const d=T();if(DB.sess[d]){DB.sess[d].dur=activeMin();save()}
@@ -1112,7 +1136,9 @@ function openSessMenu(){
     (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio.</p>':''})()+
     '<div class="group" style="margin-top:18px"><button class="cell" onclick="'+(SS.paused?'closeSheet();resumeSession()':'pauseSession()')+'"><span class="ic soft">'+ic(SS.paused?'play':'pause',16)+'</span><div class="cb"><div class="tt"><p class="bd">'+(SS.paused?'Seguir':'Pausar la sesión')+'</p><p class="fn l2">El reloj y el descanso se detienen</p></div></div></button>'+
     '<button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
-    '<button class="cell" onclick="exitSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div></div>'}));
+    '<button class="cell" onclick="exitSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div>'+
+    '<div class="group" style="margin-top:18px"><button class="cell" onclick="askRestart()"><span class="ic gray">'+ic('redo',17)+'</span><div class="cb"><div class="tt"><p class="bd">Empezar de cero</p><p class="fn l2">Borra lo anotado hoy y el reloj vuelve a 0:00</p></div></div></button>'+
+    '<button class="cell" onclick="askDiscard()"><span class="ic red">'+ic('trash',17)+'</span><div class="cb"><div class="tt"><p class="bd red">Descartar la sesión</p><p class="fn l2">Como si no la hubieras empezado</p></div></div></button></div></div>'}));
 }
 function jumpTo(i){
   if(SS.paused){SS.paused=false;SS.pauseAt=0;SS.runAt=Date.now();sessPersist();keepAwake(true)}
