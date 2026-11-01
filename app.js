@@ -985,10 +985,32 @@ function doneSet(){
   if(e.spd){logSet(e,SS.si,{r:SS.mins,sp:SS.sp||undefined})}
   else if(!e.seg){
     if(!e.bw&&!e.opt&&(SS.w==null||SS.w<=0)&&e.inc>0){toast('Pon el peso que has usado');return}
+    if(!e.bw&&SS.w>0&&SS.wOk!==e.id+':'+SS.w&&oddW(e,SS.w)){askW(e,SS.w);return}
     logSet(e,SS.si,{w:e.bw?undefined:(SS.w||undefined),r:defaultR(e)});
   }
   afterSet(e);
 }
+/* peso de referencia de un ejercicio: la mediana de lo anotado en sus últimas 8 sesiones (un error suelto no la mueve) */
+function refW(e){
+  const v=[];let n=0;
+  for(const d of Object.keys(DB.sess).sort().reverse()){
+    const a=DB.sess[d]?.ex?.[e.id];if(!Array.isArray(a))continue;
+    const w=a.filter((x,i)=>x&&x.r&&x.w>0&&!(d===T()&&i===SS.si)).map(x=>Number(x.w));
+    if(w.length){v.push(...w);if(++n>=8)break}
+  }
+  if(!v.length)return 0;v.sort((a,b)=>a-b);return v[Math.floor(v.length/2)];
+}
+/* un peso que parece un error de tecleo: más de 500 kg, o más del doble de lo habitual y al menos 10 kg por encima */
+function oddW(e,w){const m=refW(e);return w>500||(m>0&&w>m*2&&w-m>=10)}
+function askW(e,w){
+  const m=refW(e),kg=x=>String(x).replace('.',',')+' kg';
+  openSheet(()=>({title:'¿'+kg(w)+'?',body:'<div class="pad stack" style="padding-bottom:calc(env(safe-area-inset-bottom) + 24px)">'+
+    '<p class="bd l2 center balance" style="padding:0 8px">'+(m>0?'En <b>'+esc(exName(e.id))+'</b> sueles mover unos <b class="num">'+kg(m)+'</b>. Puede que se haya colado una cifra.':'Es más de lo que carga casi cualquier máquina. Puede que se haya colado una cifra.')+'</p>'+
+    '<button class="btn pri" onclick="fixW()">Corregir</button>'+
+    '<button class="btn sec" onclick="okW()">Sí, son '+kg(w)+'</button></div>'}));
+}
+function fixW(){closeSheet();const el=$('ssW');if(el){el.focus();el.select()}}
+function okW(){SS.wOk=curEx().id+':'+SS.w;closeSheet();doneSet()}
 function swToggle(){
   const e=curEx();
   if(!SS.wOn){SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();return}
