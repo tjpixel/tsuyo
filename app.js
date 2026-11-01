@@ -37,7 +37,7 @@ const IC={
 const ic=(n,s=20,w=2)=>'<svg width="'+s+'" height="'+s+'" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="'+w+'" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+IC[n]+'</svg>';
 const $=id=>document.getElementById(id);
 const dk=(pose,cell,extra)=>'<span class="deshi" data-pose="'+pose+'" data-cell="'+cell+'"'+(extra||'')+'></span>';
-const dkStage=(pose,cell)=>'<div class="dk">'+dk(pose,cell)+'<div class="floor"></div></div>';
+const dkStage=(pose,cell)=>'<div class="dk" aria-hidden="true">'+dk(pose,cell)+'<div class="floor"></div></div>';
 const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const DIAS3=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
 const MESES=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
@@ -48,9 +48,27 @@ const mmss=s=>{s=Math.max(0,Math.round(s));return Math.floor(s/60)+':'+String(s%
 /* ═════ AVISOS, SONIDO Y PANTALLA ═════ */
 let tmo;
 function toast(m){const t=$('toast');t.textContent=m;t.classList.add('on');clearTimeout(tmo);tmo=setTimeout(()=>t.classList.remove('on'),2000)}
+
+/* ═════ ACCESIBILIDAD (VoiceOver / TalkBack) ═════
+   Avisos para el lector de pantalla: solo se oyen con VoiceOver o TalkBack encendido; para quien ve, no cambia nada. */
+function say(m,urgent){const el=$(urgent?'srA':'srP');if(!el||!m)return;el.textContent='';clearTimeout(say.t);say.t=setTimeout(()=>{el.textContent=m},80)}
+const spkT=s=>{s=Math.max(0,Math.round(s));const m=Math.floor(s/60),x=s%60;return (m?m+(m===1?' minuto':' minutos'):'')+(m&&x?' y ':'')+(x||!m?x+(x===1?' segundo':' segundos'):'')};
+const spkKg=w=>String(w).replace('.',',')+(w==1?' kilo':' kilos');
+/* lleva el foco (y el cursor del lector) a un elemento; si no es enfocable, lo hace enfocable sin meterlo en el orden del tabulador */
+function a11yFocus(el){if(!el)return;if(el.tabIndex<0&&!el.hasAttribute('tabindex'))el.setAttribute('tabindex','-1');try{el.focus({preventScroll:true})}catch(e){}}
+/* solo la capa de arriba se puede recorrer: hoja > pantalla completa > app; lo de debajo queda inerte */
+function a11ySync(){
+  const sh=$('sheet'),full=['session','onb','welcome'].map($).find(x=>x&&x.classList.contains('on'));
+  const top=sh.classList.contains('on')?sh:(full||$('app'));
+  ['app','session','onb','welcome','sheet'].forEach(id=>{const x=$(id);if(x)x.inert=x!==top});
+  /* al cerrarse una pantalla completa (bienvenida, primeros pasos, sesión), el lector va al título de lo que queda */
+  if(top!==a11ySync.top&&top.id!=='sheet'&&a11ySync.top&&a11ySync.top.id!=='sheet')setTimeout(()=>{const a=document.activeElement;if(a&&a!==document.body&&top.contains(a))return;a11yFocus(top.querySelector('.view.on h1')||top.querySelector('h1'))},0);
+  a11ySync.top=top;
+}
+new MutationObserver(a11ySync).observe(document.body,{subtree:true,attributes:true,attributeFilter:['class'],attributeOldValue:false});
 let AC=null;
 function audioUnlock(){try{if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(C)AC=new C()}if(AC&&AC.state==='suspended')AC.resume()}catch(e){}}
-document.addEventListener('pointerdown',audioUnlock,{passive:true});
+['pointerdown','click','touchend','keydown'].forEach(t=>document.addEventListener(t,audioUnlock,{passive:true,capture:true}));
 function ding(){
   try{audioUnlock();const c=AC;if(!c)throw 0;
     [0,180,360].forEach(d=>setTimeout(()=>{const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);
@@ -142,7 +160,10 @@ function exLine(e){
 function setsDoneToday(n){const log=DB.sess[T()]?.ex||{};let k=0;(PLAN[n]?.ex||[]).forEach(e=>(log[e.id]||[]).forEach(s=>{if(s&&s.r)k++}));return k}
 function totalSets(n){return PLAN[n].ex.reduce((a,e)=>a+nSteps(e),0)}
 function weekStrip(P){
-  return '<div class="week">'+P.week.map(dt=>{
+  /* para el lector de pantalla, la semana en una frase: solo los días con algo */
+  const say=P.week.map(dt=>{const hd=P.map[dt],pl=P.sched[dt],sk=(P.skips||{})[dt],hoy=dt===T();const st=hd?'hecha':(sk?'saltada':(pl?'prevista':''));
+    if(!st&&!hoy)return null;return DIAS[wdOf(dt)]+' '+Number(dt.slice(8))+(hoy?' (hoy)':'')+(st?', sesión '+st:', descanso')}).filter(Boolean).join('; ');
+  return '<div class="week" role="img" aria-label="'+esc(say.replace(/^./,c=>c.toUpperCase()))+'">'+P.week.map(dt=>{
     const hd=P.map[dt],pl=P.sched[dt],sk=(P.skips||{})[dt],hoy=dt===T();
     let c=hd?'done':(sk?'skip':(pl?'plan':''));if(hoy)c+=' today';
     const dot=hoy&&!hd?'tint':(pl&&!hd&&!hoy?'on':'');
@@ -252,7 +273,7 @@ function volChart(V){
     const d=new Date(v.w+'T00:00:00');
     g+='<text x="'+(x+w/2)+'" y="'+(H-6)+'" text-anchor="middle" font-size="10" fill="'+(isCur?'var(--ink)':'var(--label3)')+'" font-weight="'+(isCur?600:400)+'">'+(isCur?'Esta':d.getDate()+' '+MESES[d.getMonth()].slice(0,3))+'</text>';
   });
-  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Volumen semanal de las últimas '+V.length+' semanas">'+g+'</svg>';
+  return '<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Volumen semanal de las últimas '+V.length+' semanas. Esta semana, '+fmtNum(V[V.length-1].t)+' kilos'+(V.length>1?'; la anterior, '+fmtNum(V[V.length-2].t)+' kilos':'')+'">'+g+'</svg>';
 }
 function renderProg(){
   const C=constancy(),V=weekVolumes(8),useCur=!V[V.length-2].t,last=useCur?V[V.length-1].t:V[V.length-2].t,prev=useCur?0:V[V.length-3].t;
@@ -330,7 +351,7 @@ function openExChart(id){
     g+='<path d="'+pts.map((p,i)=>(i?'L':'M')+X(i)+' '+Y(p.v)).join('')+'" fill="none" stroke="var(--ink)" stroke-width="2.2" stroke-linejoin="round"/>';
     g+='<circle cx="'+X(pts.length-1)+'" cy="'+Y(pts[pts.length-1].v)+'" r="4.5" fill="var(--tint)" stroke="var(--ink)" stroke-width="2"/>';
     g+='<text x="'+l+'" y="'+(H-6)+'" font-size="10" fill="var(--label3)">'+fmtD(pts[0].d)+'</text><text x="'+(W-r)+'" y="'+(H-6)+'" text-anchor="end" font-size="10" fill="var(--label3)">'+fmtD(pts[pts.length-1].d)+'</text>';
-    svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Progreso de '+esc(e.n)+'">'+g+'</svg>';
+    svg='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Progreso de '+esc(e.n)+': de '+pts[0].v+' a '+pts[pts.length-1].v+' '+unit+' entre el '+fmtD(pts[0].d)+' y el '+fmtD(pts[pts.length-1].d)+'. Máximo, '+mx+' '+unit+'">'+g+'</svg>';
   }
   const first=pts[0],lastP=pts[pts.length-1];
   openSheet(()=>({title:esc(e.n),body:'<div class="pad"><div class="card" style="padding:16px"><p class="fn l2">'+(e.spd?'Velocidad máxima':((e.bw||e.seg)?'Mejor serie':'Peso máximo'))+'</p>'+
@@ -363,14 +384,14 @@ function openDaySheet(k){
 }
 function openExSheet(k,i){
   const e=PLAN[k].ex[i],plus=isPlus(),img=IMG[e.id];
-  const stepRow=(lbl,f,val,unit)=>'<div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">'+lbl+'</span>'+(plus?'<button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+val+unit+'</span><button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button>':'<span class="val num">'+val+unit+'</span>')+'</div></div>';
+  const stepRow=(lbl,f,val,unit)=>'<div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">'+lbl+'</span>'+(plus?'<button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',-1)" aria-label="Bajar '+lbl.toLowerCase()+', ahora '+val+unit+'">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+val+unit+'</span><button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',1)" aria-label="Subir '+lbl.toLowerCase()+', ahora '+val+unit+'">'+ic('plus',16,2.4)+'</button>':'<span class="val num">'+val+unit+'</span>')+'</div></div>';
   openSheet(()=>{const e=PLAN[k].ex[i],a=advise(e);return{title:esc(e.n),body:'<div class="pad stack">'+
     '<div class="card" style="padding:14px 16px"><p class="fn l2">Hoy</p><p class="sb" style="margin-top:2px">'+a.txt+'</p>'+(e.tip?'<p class="fn l2" style="margin-top:6px">'+esc(e.tip)+'</p>':'')+'</div>'+
-    '<div><p class="ghead" style="padding-left:16px">Ajustes</p><div class="group">'+stepRow('Series','s',e.s,'')+stepRow(e.seg?'Tiempo mínimo':'Repeticiones mínimas','lo',e.lo,e.seg?(e.min?' min':' s'):'')+stepRow(e.seg?'Tiempo máximo':'Repeticiones máximas','hi',e.hi,e.seg?(e.min?' min':' s'):'')+stepRow('Descanso','r',mmss(e.r),'')+'</div>'+
+    '<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Ajustes</p><div class="group">'+stepRow('Series','s',e.s,'')+stepRow(e.seg?'Tiempo mínimo':'Repeticiones mínimas','lo',e.lo,e.seg?(e.min?' min':' s'):'')+stepRow(e.seg?'Tiempo máximo':'Repeticiones máximas','hi',e.hi,e.seg?(e.min?' min':' s'):'')+stepRow('Descanso','r',mmss(e.r),'')+'</div>'+
     (plus?'<div class="row" style="margin-top:10px"><button class="btn sec sm grow" onclick="exReset('+k+','+i+')">Valores por defecto</button><button class="btn sec sm grow danger" onclick="exRemove('+k+','+i+')">Quitar de la sesión</button></div>'
       :'<p class="gfoot" style="padding-left:16px">Con <button class="link" onclick="openPlus()">Plus</button> puedes cambiarlos.</p>')+'</div>'+
-    (e.inc>0&&!e.bw?'<div><p class="ghead" style="padding-left:16px">Tu máquina</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio. Ej.: si la placa va 6, 12, 18…, pon 6.</p></div>':'')+
-    (e.k&&e.k.length?'<div><p class="ghead" style="padding-left:16px">Técnica</p><div class="card tech" style="padding:14px 16px">'+(img?'<img src="'+img+'" alt="Técnica de '+esc(e.n)+'" loading="lazy" style="margin-bottom:12px">':'')+
+    (e.inc>0&&!e.bw?'<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Tu máquina</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',-1)" aria-label="Bajar el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',1)" aria-label="Subir el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio. Ej.: si la placa va 6, 12, 18…, pon 6.</p></div>':'')+
+    (e.k&&e.k.length?'<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Técnica</p><div class="card tech" style="padding:14px 16px">'+(img?'<img src="'+img+'" alt="Técnica de '+esc(e.n)+'" loading="lazy" style="margin-bottom:12px">':'')+
       '<ul class="sb" style="padding-left:18px">'+e.k.map(x=>'<li style="margin-top:4px">'+esc(x)+'</li>').join('')+'</ul></div></div>':'')+
     '</div>'}},true);
 }
@@ -398,7 +419,7 @@ function openCatalog(k){
   openSheet(()=>{const inDay=new Set(PLAN[k].ex.map(e=>e.id)),q=CATQ.toLowerCase();
     return{title:'Añadir ejercicio',body:'<div class="pad"><div class="field" style="margin-bottom:12px"><input id="catQ" placeholder="Buscar" value="'+esc(CATQ)+'" oninput="CATQ=this.value;openSheet(SHS[SHS.length-1],true,true);setTimeout(()=>{const i=$(\'catQ\');i.focus();i.setSelectionRange(i.value.length,i.value.length)},0)" aria-label="Buscar ejercicio"></div>'+
     GROUPS.map(g=>{const ids=Object.keys(EXC).filter(id=>EXC[id].g===g&&(!q||EXC[id].n.toLowerCase().includes(q)));if(!ids.length)return'';
-      return '<p class="ghead" style="padding-left:16px;margin-top:6px">'+g+'</p><div class="group" style="margin-bottom:12px">'+ids.map(id=>'<button class="cell" onclick="addEx('+k+',\''+id+'\')"'+(inDay.has(id)?' disabled style="opacity:.4"':'')+'><div class="cb" style="padding-left:2px"><span class="tt bd">'+esc(EXC[id].n)+'</span>'+(inDay.has(id)?'<span class="fn l2">En la sesión</span>':ic('plus',18,2.4))+'</div></button>').join('')+'</div>'}).join('')+'</div>'}},true);
+      return '<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:6px">'+g+'</p><div class="group" style="margin-bottom:12px">'+ids.map(id=>'<button class="cell" onclick="addEx('+k+',\''+id+'\')"'+(inDay.has(id)?' disabled style="opacity:.4"':'')+'><div class="cb" style="padding-left:2px"><span class="tt bd">'+esc(EXC[id].n)+'</span>'+(inDay.has(id)?'<span class="fn l2">En la sesión</span>':ic('plus',18,2.4))+'</div></button>').join('')+'</div>'}).join('')+'</div>'}},true);
 }
 function addEx(k,id){DB.plan.days[k-1].ex.push({id});DB.plan.edited=true;save();buildPlan();backSheet();openSheet(SHS[SHS.length-1],true,true);render();toast(EXC[id].n+' añadido')}
 function openTplPicker(){
@@ -429,21 +450,35 @@ function openGuide(k){openSheet(()=>({title:GUIDES[k].t,body:'<div class="prose"
 /* ═════ HOJAS ═════ */
 const SHS=[];
 function openSheet(fn,push,replace){
-  if(replace)SHS[SHS.length-1]=fn;else if(push&&$('sheet').classList.contains('on'))SHS.push(fn);else{SHS.length=0;SHS.push(fn)}
+  if(replace)SHS[SHS.length-1]=fn;else if(push&&$('sheet').classList.contains('on')){const a=document.activeElement;SHK[SHS.length]=a&&$('sheet').contains(a)?a.getAttribute('onclick'):null;SHS.push(fn)}else{SHS.length=0;SHK.length=0;SHS.push(fn)}
   drawSheet();
 }
 function drawSheet(){
   const fn=SHS[SHS.length-1];if(!fn)return closeSheet();
   const o=fn(),sh=$('sheet'),sc=sh.querySelector('.sbody')?.scrollTop||0,same=sh.dataset.k===String(SHS.length);
+  /* al redibujar la misma hoja (por ejemplo, tras − / +), el lector vuelve al mismo botón */
+  const af=document.activeElement,afK=af&&sh.contains(af)?af.getAttribute('onclick'):null;
+  if(!sh.classList.contains('on'))SHOPEN=document.activeElement;
   sh.innerHTML='<div class="grabber"></div><div class="shead">'+(SHS.length>1?'<button class="ibtn l x-btn" onclick="backSheet()" aria-label="Atrás">'+ic('chevL',18,2.4)+'</button>':'')+
-    '<p class="hl ell">'+(o.title||'')+'</p><button class="ibtn r '+(o.ok?'ok-btn':'x-btn')+'" onclick="'+(o.onOk||'closeSheet()')+'" aria-label="'+(o.ok?'Listo':'Cerrar')+'">'+ic(o.ok?'check':'x',o.ok?18:16,o.ok?2.8:2.4)+'</button></div>'+
+    '<p class="hl ell" id="shTitle" role="heading" aria-level="2" tabindex="-1">'+(o.title||'')+'</p><button class="ibtn r '+(o.ok?'ok-btn':'x-btn')+'" onclick="'+(o.onOk||'closeSheet()')+'" aria-label="'+(o.ok?'Listo':'Cerrar')+'">'+ic(o.ok?'check':'x',o.ok?18:16,o.ok?2.8:2.4)+'</button></div>'+
     '<div class="sbody">'+o.body+'</div>';
   sh.dataset.k=SHS.length;
   if(same)sh.querySelector('.sbody').scrollTop=sc;
-  sh.classList.add('on');$('scrim').classList.add('on');lockScroll(true);
+  sh.classList.add('on');$('scrim').classList.add('on');lockScroll(true);a11ySync();
+  const back=same&&afK?[...sh.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===afK):null;
+  a11yFocus(back||(same?null:$('shTitle')));
 }
-function backSheet(){SHS.pop();SHS.length?drawSheet():closeSheet()}
-function closeSheet(){const sh=$('sheet');sh.classList.remove('on','drag');sh.style.transform='';$('scrim').classList.remove('on');$('scrim').style.opacity='';SHS.length=0;delete sh.dataset.k;lockScroll(false);if(document.activeElement)document.activeElement.blur()}
+let SHOPEN=null;
+function backSheet(){SHS.pop();const k=SHK[SHS.length];SHK.length=SHS.length;if(!SHS.length)return closeSheet();drawSheet();
+  const b=k&&[...$('sheet').querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===k);if(b)a11yFocus(b)}
+const SHK=[];
+function closeSheet(){const sh=$('sheet');sh.classList.remove('on','drag');sh.style.transform='';$('scrim').classList.remove('on');$('scrim').style.opacity='';SHS.length=0;delete sh.dataset.k;lockScroll(false);a11ySync();
+  /* el lector vuelve al botón que abrió la hoja; si ese botón ya no está (la pantalla se redibujó), al título de la pantalla */
+  const o=SHOPEN,ok=o&&o.getAttribute&&o.getAttribute('onclick');SHOPEN=null;if(document.activeElement)document.activeElement.blur();
+  setTimeout(()=>{if(document.activeElement&&document.activeElement!==document.body)return;
+    let t=o&&o.isConnected&&!o.closest('[inert]')&&o.getClientRects().length?o:null;
+    if(!t&&ok)t=[...document.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===ok&&!x.closest('[inert]')&&x.getClientRects().length);
+    a11yFocus(t||document.querySelector('.full.on h1')||document.querySelector('.view.on h1'))},0)}
 /* con una hoja abierta, la pantalla de detrás no se mueve */
 let LOCKY=null;
 function lockScroll(on){
@@ -486,14 +521,14 @@ function meSheet(){
       '<input id="meName" class="t2" style="border:0;background:none;width:100%;outline:none;padding:0" value="'+esc(p.name||'')+'" placeholder="Tu nombre" maxlength="30" onchange="setName(this.value)" aria-label="Tu nombre">'+
       '<p class="fn l2">'+(USER?esc(USER.email||'Cuenta')+' · sincronizado':'En este móvil · sin cuenta')+'</p>'+
       '<span class="pill" style="margin-top:8px;background:var(--amber-soft);color:var(--amber)">Cinturón '+C.belt[1].toLowerCase()+'</span></div></div>'+
-    '<div class="pad" style="margin-top:22px"><p class="ghead" style="padding-left:16px">Deshi</p><div class="group">'+row('Aspecto','Piel, pelo y gi','openLook()')+row('Cinturón','Por constancia','openBeltSheet()')+'</div></div>'+
-    '<div class="pad" style="margin-top:22px"><p class="ghead" style="padding-left:16px">Entreno</p><div class="group">'+
+    '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Deshi</p><div class="group">'+row('Aspecto','Piel, pelo y gi','openLook()')+row('Cinturón','Por constancia','openBeltSheet()')+'</div></div>'+
+    '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Entreno</p><div class="group">'+
       row('Días de entreno',av.map(d=>WDL[d]).join(', '),'openDays()')+row('Objetivo',p.goal?GOALS[p.goal].n:'—','openPickGoal()')+row('Experiencia',p.lvl?LEVELS[p.lvl].n:'—','openPickLvl()')+'</div></div>'+
     '<div class="pad" style="margin-top:22px"><button class="group" style="display:block;width:100%" onclick="openPlus()"><div class="cell" style="min-height:64px"><span class="ic tint" style="width:34px;height:34px;border-radius:10px">'+ic('star',18)+'</span>'+
       '<div class="cb"><div class="tt"><p class="hl">'+(isPlus()?'Tsuyo Plus activo':'Prueba Tsuyo Plus')+'</p><p class="fn l2">'+(isPlus()?'Simulado en esta versión de pruebas':'7 días gratis · rutina a medida y más')+'</p></div>'+chev()+'</div></div></button></div>'+
-    '<div class="pad" style="margin-top:22px"><p class="ghead" style="padding-left:16px">Apariencia</p><div class="segc" role="group" aria-label="Apariencia">'+
+    '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Apariencia</p><div class="segc" role="group" aria-label="Apariencia">'+
       [['auto','Automática'],['light','Clara'],['dark','Oscura']].map(([k,l])=>'<button class="'+(th===k?'on':'')+'" onclick="setTheme(\''+k+'\')">'+l+'</button>').join('')+'</div></div>'+
-    '<div class="pad" style="margin-top:22px"><p class="ghead" style="padding-left:16px">Tus datos</p><div class="group">'+
+    '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Tus datos</p><div class="group">'+
       '<button class="cell" onclick="downloadData()"><span class="ic gray">'+ic('down',17)+'</span><div class="cb"><span class="tt bd">Descargar mis datos</span></div></button>'+
       '<button class="cell" onclick="openImport()"><span class="ic gray">'+ic('up',17)+'</span><div class="cb"><div class="tt"><p class="bd">Importar una copia</p><p class="fn l2">De Tsuyo o de NEXA Fit</p></div>'+chev()+'</div></button>'+
       '<button class="cell" onclick="openPrivacy()"><span class="ic gray">'+ic('shield',17)+'</span><div class="cb"><span class="tt bd">Privacidad</span>'+chev()+'</div></button>'+
@@ -505,14 +540,14 @@ function meSheet(){
 function setName(v){DB.profile=Object.assign({},DB.profile,{name:v.trim().slice(0,30)});save()}
 function openLook(){
   openSheet(()=>{const L=Deshi.getLook(),chip=(on,js,color,lbl)=>'<button class="ibtn" style="width:46px;height:46px;background:'+color+';box-shadow:inset 0 0 0 '+(on?'3px var(--ink)':'.5px var(--sep)')+'" onclick="'+js+'" aria-label="'+lbl+'" aria-pressed="'+on+'"></button>';
-    const grp=(t,arr,key)=>'<p class="ghead" style="padding-left:16px;margin-top:16px">'+t+'</p><div class="card row" style="padding:12px 14px;flex-wrap:wrap">'+arr.map(([n,c],i)=>chip(L[key]===i,"setLook('"+key+"',"+i+")",c,t+' '+n)).join('')+'</div>';
+    const grp=(t,arr,key)=>'<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:16px">'+t+'</p><div class="card row" style="padding:12px 14px;flex-wrap:wrap">'+arr.map(([n,c],i)=>chip(L[key]===i,"setLook('"+key+"',"+i+")",c,t+' '+n)).join('')+'</div>';
     return{title:'Aspecto de Deshi',body:'<div style="display:flex;justify-content:center;padding:8px 0 10px">'+dkStage('guard',2.6)+'</div><div class="pad">'+grp('Piel',Deshi.SKINS,'skin')+grp('Pelo',Deshi.HAIRS,'hair')+grp('Gi',Deshi.GIS,'gi')+'</div>'}},true);
 }
 function setLook(k,i){const L=Object.assign({},DB.profile.deshi||{});L[k]=i;DB.profile=Object.assign({},DB.profile,{deshi:Deshi.cleanLook(L)});save();applyLook();drawSheet();render()}
 function openDays(){
   openSheet(()=>{const av=DB.cfg.avail||[],nd=dayKeys().length;
     return{title:'Días de entreno',body:'<div class="pad"><p class="sb l2 center" style="padding:0 10px 16px">Tsuyo coloca tus '+nd+' sesiones en estos días y, si te saltas una, la mueve sola.</p>'+
-      '<div class="daysel">'+[1,2,3,4,5,6,0].map(d=>'<button class="'+(av.includes(d)?'on':'')+'" onclick="toggleDay('+d+')" aria-pressed="'+av.includes(d)+'">'+WDL[d]+'</button>').join('')+'</div>'+
+      '<div class="daysel">'+[1,2,3,4,5,6,0].map(d=>'<button class="'+(av.includes(d)?'on':'')+'" onclick="toggleDay('+d+')" aria-label="'+DIAS[d].replace(/^./,c=>c.toUpperCase())+'" aria-pressed="'+av.includes(d)+'">'+WDL[d]+'</button>').join('')+'</div>'+
       (av.length<nd?'<div class="note" style="margin-top:14px">Tienes menos días que sesiones: cada semana quedará fuera la menos importante.</div>':'')+'</div>'}},true);
 }
 function toggleDay(d){const a=DB.cfg.avail||[];const i=a.indexOf(d);if(i>=0){if(a.length===1){toast('Elige al menos un día');return}a.splice(i,1)}else a.push(d);DB.cfg.avail=a;save();drawSheet();render()}
@@ -573,7 +608,7 @@ function impCheck(txt){
   const unknown=[...new Set(plan.days.flatMap(d=>d.ex.map(e=>e.id)).filter(id=>!EXC[id]&&!(o.cex||{})[id]))];
   openSheet(()=>({title:'Revisar copia',body:'<div class="pad stack">'+
     '<div class="card" style="padding:14px 16px"><p class="hl">'+done.length+' sesiones</p><p class="fn l2">'+(done.length?'Del '+fmtD(done[0])+' al '+fmtD(done[done.length-1]):'Sin entrenos registrados')+(o.cfg&&o.cfg.start?' · bloque iniciado el '+fmtD(o.cfg.start):'')+'</p></div>'+
-    '<p class="ghead" style="padding-left:16px;margin-bottom:-4px">'+(inferred?'Rutina deducida de tu historial':'Rutina de la copia')+'</p>'+
+    '<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-bottom:-4px">'+(inferred?'Rutina deducida de tu historial':'Rutina de la copia')+'</p>'+
     plan.days.map((d,i)=>'<div class="card" style="padding:12px 16px"><p class="hl">'+esc(d.n)+'</p><p class="fn l2" style="margin-top:3px">'+d.ex.map(e=>esc((EXC[e.id]||(o.cex||{})[e.id]||{n:e.id}).n)+(e.s?' ('+e.s+(e.side?' por lado':'')+')':(e.side?' (por lado)':''))).join(' · ')+'</p></div>').join('')+
     (fixes.length?'<div class="note">He descartado '+(fixes.length===1?'un valor imposible':fixes.length+' valores imposibles')+': '+fixes.slice(0,3).map(esc).join(' · ')+(fixes.length>3?'…':'')+'.</div>':'')+(unknown.length?'<div class="note">Hay ejercicios que Tsuyo no conoce: '+unknown.map(esc).join(', ')+'. Se añadirán como ejercicios propios.</div>':'')+
     '<p class="fn l2" style="padding:0 6px">'+(inferred?'Los rangos y descansos son los de cada ejercicio por defecto; con Plus puedes ajustarlos. ':'')+'Tu rutina actual de Tsuyo se sustituye; las sesiones que ya tengas se conservan.</p>'+
@@ -727,13 +762,14 @@ function onbGo(d){
 }
 function renderOnb(){
   const st=['goal','lvl','days','routine'][ONB.i];let h='';
-  const head='<div class="fnav"><button class="ibtn glass" onclick="onbGo(-1)" aria-label="Atrás">'+ic('chevL',22,2.2)+'</button><div class="dots" style="width:132px" aria-label="Paso '+(ONB.i+1)+' de 4">'+[0,1,2,3].map(i=>'<i class="'+(i<=ONB.i?'on':'')+'"></i>').join('')+'</div><div style="width:44px"></div></div>';
+  const af=document.activeElement,afK=af&&$('onb').contains(af)?af.getAttribute('onclick'):null,sameStep=renderOnb.last===ONB.i;renderOnb.last=ONB.i;
+  const head='<div class="fnav"><button class="ibtn glass" onclick="onbGo(-1)" aria-label="Atrás">'+ic('chevL',22,2.2)+'</button><div class="dots" style="width:132px" role="img" aria-label="Paso '+(ONB.i+1)+' de 4">'+[0,1,2,3].map(i=>'<i class="'+(i<=ONB.i?'on':'')+'"></i>').join('')+'</div><div style="width:44px"></div></div>';
   if(st==='goal')h='<h1 class="lt balance" style="margin-top:24px">¿Qué quieres conseguir?</h1><p class="sb l2" style="margin-top:8px">Con esto elegimos tu rutina. Puedes cambiarlo cuando quieras.</p><div class="stack" style="margin-top:24px;gap:10px">'+
     Object.keys(GOALS).map(k=>optBtn({n:GOALS[k].n,s:{grasa:'Bajar grasa sin perder músculo',musculo:'Aumentar masa muscular',fuerza:'Mover más peso en los básicos',salud:'Moverme y sentirme bien',deporte:'Pádel, fútbol, artes marciales…'}[k]},ONB.goal===k,"ONB.goal='"+k+"';renderOnb()",GOAL_IC[k])).join('')+'</div>';
   if(st==='lvl')h='<h1 class="lt balance" style="margin-top:24px">¿Cuánto has entrenado?</h1><p class="sb l2" style="margin-top:8px">Así ajustamos la rutina y los primeros pesos.</p><div class="stack" style="margin-top:24px;gap:10px">'+
     Object.keys(LEVELS).map(k=>optBtn(LEVELS[k],ONB.lvl===k,"ONB.lvl='"+k+"';renderOnb()")).join('')+'</div>';
   if(st==='days')h='<h1 class="lt balance" style="margin-top:24px">¿Qué días puedes entrenar?</h1><p class="sb l2" style="margin-top:8px">Si un día no puedes, Tsuyo mueve la sesión sola.</p><div class="daysel" style="margin-top:28px">'+
-    [1,2,3,4,5,6,0].map(d=>'<button class="'+(ONB.av.includes(d)?'on':'')+'" onclick="onbDay('+d+')" aria-pressed="'+ONB.av.includes(d)+'">'+WDL[d]+'</button>').join('')+'</div><p class="fn l2 center" style="margin-top:12px">'+ONB.av.length+' día'+(ONB.av.length===1?'':'s')+' a la semana</p>';
+    [1,2,3,4,5,6,0].map(d=>'<button class="'+(ONB.av.includes(d)?'on':'')+'" onclick="onbDay('+d+')" aria-label="'+DIAS[d].replace(/^./,c=>c.toUpperCase())+'" aria-pressed="'+ONB.av.includes(d)+'">'+WDL[d]+'</button>').join('')+'</div><p class="fn l2 center" style="margin-top:12px">'+ONB.av.length+' día'+(ONB.av.length===1?'':'s')+' a la semana</p>';
   if(st==='routine'){
     const t=TPLS[ONB.tpl],rec=rankTpls({goal:ONB.goal,lvl:ONB.lvl},ONB.av.length)[0]===ONB.tpl;
     const days=ONB.av.slice().sort((a,b)=>((a+6)%7)-((b+6)%7));
@@ -746,6 +782,9 @@ function renderOnb(){
   }
   $('onb').innerHTML='<div class="fullin">'+head+h+'<div class="foot">'+(st==='routine'?'<button class="btn tx" onclick="onbOthers()">Ver otras rutinas</button>':'')+
     '<button class="btn pri" onclick="onbGo(1)">'+(st==='routine'?'Empezar a entrenar':'Continuar')+'</button></div></div>';
+  /* lector de pantalla: al cambiar de paso, al título; al marcar una opción, se queda en ella */
+  const box=$('onb'),back=sameStep&&afK?[...box.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===afK):null;
+  if($('onb').classList.contains('on')||back){a11ySync();a11yFocus(back||box.querySelector('h1'))}
 }
 function onbDay(d){const i=ONB.av.indexOf(d);if(i>=0)ONB.av.splice(i,1);else ONB.av.push(d);renderOnb()}
 function onbOthers(){
@@ -786,14 +825,14 @@ function openSession(day){
   SS.ph=found?'set':'done';
   if(SS.ph==='done')freezeClock();
   sessPersist();
-  $('session').classList.add('on');keepAwake(!SS.paused);startClock();renderSession();renderAcc();
+  SS.a11yK=null;$('session').classList.add('on');keepAwake(!SS.paused);startClock();renderSession();renderAcc();
 }
 const activeMs=()=>SS.acc+(SS.paused||!SS.runAt?0:Date.now()-SS.runAt);
 const activeMin=()=>Math.max(1,Math.round(activeMs()/60000));
 function sessPersist(out){PREF.set('sess',{d:T(),n:SS.day,R0:SS.R0,acc:SS.acc,run:SS.paused?0:SS.runAt,out:out?1:undefined})}
 /* deja el reloj quieto (pausa, salir o sesión terminada): lo contado pasa a «acc» */
 function freezeClock(){if(SS.runAt){SS.acc=activeMs();SS.runAt=0}}
-function startClock(){clearInterval(SS.cI);SS.cI=setInterval(()=>{const c=$('ssClock');if(c&&!SS.min)c.textContent=mmss(activeMs()/1000)},1000)}
+function startClock(){clearInterval(SS.cI);SS.cI=setInterval(()=>{const c=$('ssClock');if(c&&!SS.min){c.textContent=mmss(activeMs()/1000);c.setAttribute('aria-label','Tiempo entrenando: '+spkT(activeMs()/1000))}},1000)}
 /* Pausa/Seguir lo congela todo: el reloj de arriba, el descanso (también el de la cápsula) y los cronómetros de cardio y plancha.
    Al seguir, todo continúa justo donde estaba. */
 function pauseSession(){
@@ -811,8 +850,8 @@ function resumeSession(){
   renderSession();renderAcc();
 }
 function prSnapshot(){const R=prData(),o={};Object.keys(R).forEach(k=>o[k]=R[k].v);return o}
-function minimizeSession(){SS.min=true;$('session').classList.remove('on');render()}
-function expandSession(){if(!SS.on)return;SS.min=false;$('session').classList.add('on');renderSession();renderAcc();keepAwake(true)}
+function minimizeSession(){SS.min=true;$('session').classList.remove('on');render();renderAcc();a11ySync();a11yFocus($('acc'))}
+function expandSession(){if(!SS.on)return;SS.min=false;SS.a11yK=null;$('session').classList.add('on');renderSession();renderAcc();keepAwake(true)}
 function closeSession(){
   stopTimer();clearInterval(SS.cI);SS.on=false;SS.paused=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);PREF.set('sess',null);closeSheet();render();
 }
@@ -840,15 +879,16 @@ const exDoneAt=i=>{const e=PLAN[SS.day].ex[i],s=setsFor(e);if((SS.past||[]).incl
 /* siguiente ejercicio pendiente: primero los que vienen detrás; después, los que dejaste atrás */
 function nextPend(){const n=PLAN[SS.day].ex.length;for(let k=1;k<n;k++){const i=(SS.ei+k)%n;if(!exDoneAt(i))return i}return -1}
 function firstStep(i){const e=PLAN[SS.day].ex[i],s=setsFor(e);for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r))return j;return 0}
-function sessDots(){const p=PLAN[SS.day];return '<div class="dots" aria-label="Ejercicio '+(SS.ei+1)+' de '+p.ex.length+'">'+p.ex.map((e,i)=>'<i class="'+(i===SS.ei?'now':(exDoneAt(i)?'on':''))+'"></i>').join('')+'</div>'}
+function sessDots(){const p=PLAN[SS.day],dn=p.ex.filter((e,i)=>exDoneAt(i)).length;return '<div class="dots" role="img" aria-label="Ejercicio '+(SS.ei+1)+' de '+p.ex.length+', '+dn+(dn===1?' hecho':' hechos')+'">'+p.ex.map((e,i)=>'<i class="'+(i===SS.ei?'now':(exDoneAt(i)?'on':''))+'"></i>').join('')+'</div>'}
 function sessHead(){
   return '<div class="fnav"><button class="ibtn glass" onclick="minimizeSession()" aria-label="Minimizar la sesión">'+ic('chevD',22,2.2)+'</button>'+
-    '<div class="center"><p class="fn semi">'+esc(PLAN[SS.day].n)+'</p><p class="c1 l2 num" id="ssClock">'+mmss(activeMs()/1000)+'</p></div>'+
+    '<div class="center"><p class="fn semi">'+esc(PLAN[SS.day].n)+'</p><p class="c1 l2 num" id="ssClock" role="timer">'+mmss(activeMs()/1000)+'</p></div>'+
     '<button class="ibtn glass" onclick="openSessMenu()" aria-label="Opciones de la sesión">'+ic('more',22)+'</button></div>';
 }
 function rirHint(){const B=blockInfo();if(!B)return'1–2 reps';if(B.bw===11)return'4 reps';if((B.b===1&&B.bw<=3)||(B.b>1&&B.bw===1))return'3 reps';return'1–2 reps'}
 function renderSession(){
   if(!SS.on)return;
+  const af=document.activeElement;SS.a11yAf=af&&$('session').contains(af)?af.getAttribute('onclick'):null;
   const p=PLAN[SS.day],box=$('session');let h='';
   if(SS.ph==='done'){renderDone();return}
   if(SS.paused){renderPaused();return}
@@ -883,8 +923,8 @@ function renderSession(){
       const tgt=e.lo===e.hi?e.hi:e.lo+'–'+e.hi;
       h+='<div style="flex:1 1 0;min-height:24px"></div>'+(e.bw?'<div class="center"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
         :'<div style="display:flex;flex-direction:column;align-items:center"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
-          '<button class="step" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
-          '<button class="step" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>')+
+          '<button class="step" id="ssWm" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Peso en kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
+          '<button class="step" id="ssWp" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>')+
         '<p class="sb l2 center num" style="margin-top:44px">'+(e.bw?'':'<span class="semi" style="color:var(--label)">'+tgt+' '+u+(e.side?' por lado':'')+'</span> · ')+'deja '+rirHint()+' en recámara</p><div style="flex:1.7 1 0"></div>'+
         '<div class="foot"><button class="btn pri lg" onclick="doneSet()">'+ic('check',22,2.6)+'Serie hecha</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
     }
@@ -901,7 +941,56 @@ function renderSession(){
       (SS.last?'':'<div class="row" style="justify-content:center;gap:10px;margin-top:44px"><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="addRest(30)">+30 s</button><button class="btn sec sm" style="height:44px;padding:0 20px;border-radius:22px;font-size:15px" onclick="endRest()">Saltar descanso</button></div>')+
       '<div style="flex:1 1 0;min-height:22px"></div><div class="foot" style="padding-top:22px">'+(A?annCard(ae,A,kind,prepOK()?null:nx):'')+prepBtn()+(SS.last?'<button class="btn pri lg" onclick="finishSession()">Terminar sesión</button>':'')+'</div>';
   }
-  box.innerHTML='<div class="fullin">'+h+'</div>';fitW($('ssW'));
+  box.innerHTML='<div class="fullin">'+h+'</div>';fitW($('ssW'));a11ySess();
+}
+
+/* ═════ SESIÓN CON LECTOR DE PANTALLA ═════
+   Cada vez que cambia el paso (serie, descanso, pausa, fin), el lector salta al título y lo dice todo de una vez:
+   «Press banca. Serie 2 de 4. 40 kilos, objetivo 8 a 10 repeticiones». Los redibujados del mismo paso no mueven el foco. */
+function a11ySess(){
+  const box=$('session'),H=box.querySelector('h1');if(!H)return;
+  H.id='ssH';let s='';
+  if(SS.ph==='done'){const p=H.nextElementSibling;if(p){s='. '+p.textContent;p.setAttribute('aria-hidden','true')}}
+  else if(SS.paused){const p=H.nextElementSibling;if(p){s='. '+p.textContent+'. Pulsa Seguir para continuar';p.setAttribute('aria-hidden','true')}}
+  else if(SS.ph==='set'){
+    const e=curEx(),setN=e.side?Math.floor(SS.si/2)+1:SS.si+1,lo=e.lo,hi=e.hi,rng=lo===hi?String(hi):lo+' a '+hi;
+    s='. Serie '+setN+' de '+e.s+(e.side?(SS.si%2?', lado derecho':', lado izquierdo'):'');
+    if(e.spd)s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';
+    else if(e.seg)s+=SS.wOn?'. Cronómetro en marcha':'. Por tiempo, objetivo '+rng+' segundos. Pulsa Empezar';
+    else if(e.bw)s+='. Peso corporal, objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
+    else s+='. '+(SS.w?spkKg(SS.w):'Sin peso puesto')+', objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
+    if(SS.bg&&SS.tEnd)s+='. El descanso sigue: quedan '+spkT((SS.tEnd-Date.now())/1000);
+    const sb=box.querySelector('.setbar');if(sb&&sb.parentElement)sb.parentElement.setAttribute('aria-hidden','true');
+    wLabels();
+  }else if(SS.ph==='rest'){
+    const pv=H.previousElementSibling;if(pv&&pv.textContent){s='. '+pv.textContent;pv.setAttribute('aria-hidden','true')}
+    if(SS.last)s+='. Ya no quedan series. Anota esta y pulsa Terminar sesión';
+    else{s+='. Quedan '+spkT((SS.tEnd-Date.now())/1000);if(SS.ann)s+=(SS.ann.e.seg||SS.ann.e.spd)?'. Debajo puedes anotar cómo ha ido':'. Debajo puedes anotar las repeticiones y cómo ha ido';const nx=nextLabel();if(nx)s+='. Después: '+nx.replace(/&amp;/g,'&').replace(' kg',' kilos')}
+  }
+  if(s){const sp=document.createElement('span');sp.className='sr';sp.textContent=s.replace(/\s+·\s+/g,', ').replace(/–/g,' a ');H.appendChild(sp)}
+  a11yTimers();
+  const k=[SS.ph,SS.ei,SS.si,SS.last,SS.paused,SS.sw].join('|');
+  if(k!==SS.a11yK&&!$('sheet').classList.contains('on')){SS.a11yK=k;a11ySync();a11yFocus(H)}
+  /* mismo paso redibujado (por ejemplo, Empezar → Parar en la plancha): el lector se queda en el mismo botón o en el principal */
+  else if(SS.a11yAf&&(document.activeElement===document.body||!document.activeElement)){const b=[...box.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===SS.a11yAf)||box.querySelector('.foot .btn.pri');a11yFocus(b||H)}
+}
+/* los relojes se leen en palabras («quedan 1 minuto y 20 segundos»), no «1:20» */
+function a11yTimers(){
+  const lab=(id,txt)=>{const t=$(id);if(!t)return;const r=t.closest('.ring');if(!r)return;r.setAttribute('role','timer');r.setAttribute('aria-label',txt);const i=r.querySelector('.in');if(i)i.setAttribute('aria-hidden','true')};
+  if(SS.ph==='rest'&&SS.tEnd)lab('rT','Descanso: quedan '+spkT(Math.ceil((SS.tEnd-(SS.paused?SS.pauseAt:Date.now()))/1000)));
+  const e=SS.on&&SS.ph==='set'?curEx():null;if(!e)return;
+  if(e.spd){const el=cEl();lab('cT','Cardio: llevas '+spkT(el)+' de '+spkT((SS.mins||e.hi)*60))}
+  else if(e.seg){const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0;lab('swT','Llevas '+spkT(el)+', objetivo '+e.lo+' a '+e.hi+' segundos')}
+  const p=$('bgPill');if(p&&SS.tEnd)p.setAttribute('aria-label','Descanso: quedan '+spkT(Math.ceil((SS.tEnd-Date.now())/1000)));
+}
+/* avisos mientras corre el tiempo: a los 10 s del descanso, al acabarlo y al entrar en rango en las series por tiempo */
+function a11yTick(){
+  if(SS.paused)return;
+  const sec=Math.floor(Date.now()/1000);if(sec===SS.a11yS)return;SS.a11yS=sec;a11yTimers();
+  const e=SS.on&&SS.ph==='set'?curEx():null;
+  if(e&&e.seg&&SS.wOn){const el=Math.floor((Date.now()-SS.wStart)/1000),st=el>=e.hi?2:(el>=e.lo?1:0);
+    if(st!==SS.a11ySeg){if(st===1)say('En rango, '+el+' segundos');if(st===2)say('Tope del rango, '+el+' segundos');SS.a11ySeg=st}}
+  else SS.a11ySeg=0;
 }
 /* progreso de series: un tramo por serie; en ejercicios por lados el tramo actual se llena a la mitad tras el primer lado */
 function setBar(e,setN){
@@ -909,13 +998,14 @@ function setBar(e,setN){
   return '<div class="setbar" aria-hidden="true">'+Array.from({length:e.s},(_,i)=>'<i class="'+(i<setN-1?'on':(i===setN-1?(half?'now half':'now'):''))+'"></i>').join('')+'</div>';
 }
 function stepper(lbl,val,unit,id,step){
-  return '<div class="card row" style="padding:10px 10px 10px 18px"><span class="bd grow">'+lbl+'</span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\',-'+step+')" aria-label="Menos">'+ic('minus',16,2.4)+'</button>'+
-    '<span class="t3 num" style="min-width:76px;text-align:center"><span id="'+id+'">'+val+'</span> <span class="fn l2">'+unit+'</span></span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\','+step+')" aria-label="Más">'+ic('plus',16,2.4)+'</button></div>';
+  return '<div class="card row" style="padding:10px 10px 10px 18px"><span class="bd grow">'+lbl+'</span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\',-'+step+')" aria-label="Bajar '+lbl.toLowerCase()+'">'+ic('minus',16,2.4)+'</button>'+
+    '<span class="t3 num" style="min-width:76px;text-align:center"><span id="'+id+'">'+val+'</span> <span class="fn l2">'+unit+'</span></span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\','+step+')" aria-label="Subir '+lbl.toLowerCase()+'">'+ic('plus',16,2.4)+'</button></div>';
 }
 function adjV(id,d){
   if(id==='ssMin')SS.mins=Math.max(1,(SS.mins||0)+d);
   if(id==='ssSp')SS.sp=Math.max(0,Math.round(((SS.sp||0)+d)*10)/10);
   const el=$(id);if(el)el.textContent=id==='ssMin'?SS.mins:SS.sp;
+  say(id==='ssMin'?'Objetivo, '+SS.mins+(SS.mins===1?' minuto':' minutos'):'Velocidad, '+String(SS.sp).replace('.',',')+' kilómetros por hora');
 }
 /* el campo de peso crece con la cifra para que «42,5» no pise los «kg» */
 let _cv;
@@ -927,7 +1017,10 @@ function fitW(el){
   el.style.fontSize=fs+'px';el.style.width=Math.ceil(w+fs*.16+4)+'px';   // margen: el lienzo no aplica cifras tabulares ni el redondeo del glifo
   if(!fitW.ready&&document.fonts&&document.fonts.ready){fitW.ready=1;document.fonts.ready.then(()=>fitW($('ssW')))}
 }
-function adjW(d){const e=curEx(),inc=e.inc||2.5,w=SS.w==null?0:SS.w;SS.w=Math.max(0,offStep(w,inc)?r2((d>0?Math.ceil(w/inc):Math.floor(w/inc))*inc):r2(w+d*inc));const el=$('ssW');if(el){el.value=SS.w;fitW(el)}}
+function nextW(d){const e=curEx(),inc=e.inc||2.5,w=SS.w==null?0:SS.w;return Math.max(0,offStep(w,inc)?r2((d>0?Math.ceil(w/inc):Math.floor(w/inc))*inc):r2(w+d*inc))}
+function adjW(d){SS.w=nextW(d);const el=$('ssW');if(el){el.value=SS.w;fitW(el)}wLabels();say(spkKg(SS.w))}
+/* los botones − / + dicen a qué peso llevan («Bajar a 42 kilos»), para no ir a ciegas */
+function wLabels(){const m=$('ssWm'),p=$('ssWp');if(m)m.setAttribute('aria-label','Bajar a '+spkKg(nextW(-1)));if(p)p.setAttribute('aria-label','Subir a '+spkKg(nextW(1)))}
 function nextLabel(){
   const p=PLAN[SS.day],e=curEx();
   if(SS.last)return null;
@@ -939,7 +1032,8 @@ function nextLabel(){
 /* el descanso avisa al acabarse: ámbar en los últimos 10 s, rojo en los 3 últimos, con vibración (heredado de NEXA Fit) */
 const restCol=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--warn)':'var(--tint)');
 const restTxt=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--amber)':'');
-function restBuzz(L){const p=SS.prevL;SS.prevL=L;if(p==null)return;if((p>10&&L<=10)||(p>3&&L<=3))try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}}
+function restBuzz(L){const p=SS.prevL;SS.prevL=L;if(p==null)return;if((p>10&&L<=10)||(p>3&&L<=3))try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}
+  if(p>10&&L<=10)say('Quedan 10 segundos de descanso')}
 function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&nextPend()>=0}
 function prepBtn(){
   if(!prepOK())return'';const ne=PLAN[SS.day].ex[nextPend()];
@@ -969,11 +1063,11 @@ function annCard(e,A,kind,nx){
   return '<div class="anncard"><div class="row" style="justify-content:space-between"><p class="hl">Anota la serie '+(e.side?Math.floor(SS.ann.si/2)+1:SS.ann.si+1)+'</p><p class="fn l2 num">'+(A.w?A.w+' kg':(e.bw?'peso corporal':''))+'</p></div>'+
     (valTxt?'<p class="t3 num" style="margin-top:8px">'+valTxt+'</p>'
       :'<div class="row" style="justify-content:space-between;margin-top:12px;padding:6px 6px 6px 14px;border-radius:22px;background:var(--fill2)"><span class="bd">Repeticiones</span><div class="row" style="gap:12px">'+
-      '<button class="mini" onclick="annRep(-1)" aria-label="Una menos">'+ic('minus',18,2.4)+'</button><span class="t2 num" id="annR" style="min-width:30px;text-align:center">'+A.r+'</span><button class="mini" onclick="annRep(1)" aria-label="Una más">'+ic('plus',18,2.4)+'</button></div></div>')+
+      '<button class="mini" onclick="annRep(-1)" aria-label="Una repetición menos">'+ic('minus',18,2.4)+'</button><span class="t2 num" id="annR" style="min-width:30px;text-align:center">'+A.r+'</span><button class="mini" onclick="annRep(1)" aria-label="Una repetición más">'+ic('plus',18,2.4)+'</button></div></div>')+
     '<p class="fn l2" style="margin:14px 0 8px">¿Cómo ha ido?</p><div class="seg3">'+EFF[kind].map(([v,t,s])=>'<button data-v="'+v+'" class="'+(A.rir===v?'on':'')+'" onclick="setEff('+v+')" aria-pressed="'+(A.rir===v)+'"><span class="hl">'+t+'</span><span class="c1 l2">'+s+'</span></button>').join('')+'</div>'+
     (nx?'<div class="row" style="margin-top:14px;padding-top:12px;border-top:.5px solid var(--sep)"><span class="fn l2 grow">Siguiente</span><span class="fn semi num">'+nx+'</span></div>':'')+'</div>';
 }
-function annRep(d){if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.r=Math.max(0,(A.r||0)+d);save();const el=$('annR');if(el)el.textContent=A.r}
+function annRep(d){if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.r=Math.max(0,(A.r||0)+d);save();const el=$('annR');if(el)el.textContent=A.r;say(A.r+(A.r===1?' repetición':' repeticiones'))}
 /* anotar el esfuerzo sin repintar la pantalla: el temporizador no se mueve ni parpadea */
 function setEff(v){
   if(!SS.ann)return;const A=setsFor(SS.ann.e)[SS.ann.si];if(!A)return;A.rir=A.rir===v?undefined:v;save();
@@ -1041,24 +1135,25 @@ function advance(){
   SS.ph='set';SS.ann=null;
 }
 function skipSet(){const p=PLAN[SS.day],e=curEx();if(SS.si>=nSteps(e)-1&&nextPend()<0){finishSession();return}SS.wOn=false;advance();renderSession();renderAcc()}
-function addRest(s){SS.tEnd+=s*1000;SS.tTot+=s;SS.prevL=null;tick()}
+function addRest(s){SS.tEnd+=s*1000;SS.tTot+=s;SS.prevL=null;tick();say('Quedan '+spkT(Math.ceil((SS.tEnd-Date.now())/1000)))}
 function endRest(){advance();renderSession();renderAcc()}
 function startTick(){stopTimer();SS.tI=setInterval(tick,250);tick()}
 function stopTimer(){clearInterval(SS.tI);SS.tI=null}
 function tick(){
   if(SS.paused)return;
+  a11yTick();
   const c=$('ssClock');if(c)c.textContent=mmss(activeMs()/1000);
   if(SS.bg&&SS.tEnd){
     const L=Math.max(0,(SS.tEnd-Date.now())/1000),t=$('bgT'),a=$('bgArc');
     if(t){t.textContent=(L<=10?'Prepárate · ':'Descanso · ')+mmss(Math.ceil(L));t.style.color=restTxt(L)}if(a){const C=2*Math.PI*11;a.setAttribute('stroke-dashoffset',-C*(1-L/SS.tTot));a.setAttribute('stroke',restCol(L))}
     restBuzz(L);
-    if(L<=0){ding();endBgRest(true)}else if(!SS.wOn)renderAcc();
+    if(L<=0){ding();say('Descanso terminado',true);endBgRest(true)}else if(!SS.wOn)renderAcc();
     if(!SS.wOn)return;
   }
   if(SS.ph==='set'&&SS.wOn&&curEx().spd){
     const el=cEl(),tg=SS.mins*60,t=$('cT'),a=$('cArc'),l=$('cL');
     if(t)t.textContent=mmss(el);if(a){const C=2*Math.PI*80;a.setAttribute('stroke-dashoffset',C*(1-Math.min(1,el/tg)))}if(l)l.textContent=cLab(el,tg);
-    if(el>=tg&&!SS.cDone){SS.cDone=true;ding()}
+    if(el>=tg&&!SS.cDone){SS.cDone=true;ding();say('Objetivo de cardio cumplido',true)}
     renderAcc();return;
   }
   if(SS.ph==='set'&&SS.wOn){
@@ -1074,7 +1169,7 @@ function tick(){
   const rl=$('rL');if(rl)rl.textContent=L<=10?'Prepárate':'de '+mmss(SS.tTot);
   restBuzz(L);
   renderAcc();
-  if(L<=0){ding();advance();if(!SS.min)renderSession();renderAcc();if(SS.ph==='set'&&!SS.min)keepAwake(true)}
+  if(L<=0){ding();advance();if(SS.min)say('Descanso terminado',true);if(!SS.min)renderSession();renderAcc();if(SS.ph==='set'&&!SS.min)keepAwake(true)}
 }
 /* pantalla de pausa: todo quieto; «Seguir» en lima, como en Neiro */
 function pausedWhat(){
@@ -1092,7 +1187,7 @@ function renderPaused(){
     '<div style="flex:1 1 0;min-height:24px"></div><div style="display:flex;justify-content:center">'+dkStage('seiza',2)+'</div>'+
     '<h1 class="lt center" style="margin-top:22px">En pausa</h1><p class="sb l2 center num" style="margin-top:6px">'+pausedWhat()+'</p>'+bg+
     '<p class="fn l3 center" style="margin-top:14px">El reloj y el descanso están detenidos.<br>Este rato no cuenta como entrenamiento.</p>'+
-    '<div style="flex:1.3 1 0"></div><div class="foot"><button class="btn pri lg" onclick="resumeSession()">'+ic('play',20)+'Seguir</button><button class="btn tx" onclick="finishSession()">Terminar la sesión</button></div></div>';
+    '<div style="flex:1.3 1 0"></div><div class="foot"><button class="btn pri lg" onclick="resumeSession()">'+ic('play',20)+'Seguir</button><button class="btn tx" onclick="finishSession()">Terminar la sesión</button></div></div>';a11ySess();
 }
 /* salir sin terminar: lo anotado se guarda y el reloj se queda donde estaba; al volver hoy, sigue desde ahí */
 function exitSession(){freezeClock();SS.paused=false;sessPersist(true);stopTimer();clearInterval(SS.cI);SS.on=false;SS.min=false;$('session').classList.remove('on');keepAwake(false);closeSheet();render()}
@@ -1127,13 +1222,13 @@ function renderDone(){
       '<div class="grow center" style="padding:13px 8px 12px'+(i?';border-left:.5px solid var(--sep)':'')+'"><p class="fn l2">'+l+'</p><p class="t2 num">'+v+'<span class="sb l3 semi">'+u+'</span></p></div>').join('')+'</div>'+
     news.slice(0,3).map(id=>'<div class="card row" style="padding:14px 16px;gap:13px"><span class="ic tint" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center">'+ic('trophy',22)+'</span><div class="grow"><p class="fn ink semi">Nuevo récord</p><p class="hl num">'+esc(exName(id))+' · '+esc(R[id].lbl)+'</p></div></div>').join('')+
     (nx?'<div class="card row" style="padding:14px 16px;gap:13px"><span class="ic gray" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center">'+ic('cal',18)+'</span><div class="grow"><p class="fn l2">Próxima sesión</p><p class="hl">'+esc(PLAN[nx.n].n)+' · '+nx.when+'</p></div></div>':'')+
-    '</div><div class="foot"><button class="btn pri lg" onclick="closeSession()">Listo</button></div></div>';
+    '</div><div class="foot"><button class="btn pri lg" onclick="closeSession()">Listo</button></div></div>';a11ySess();
 }
 function openSessMenu(){
   const p=PLAN[SS.day],log=DB.sess[T()]?.ex||{};
-  openSheet(()=>({title:'Sesión',body:'<div class="pad"><p class="ghead" style="padding-left:16px">Ir a un ejercicio</p><div class="group">'+p.ex.map((e,i)=>{const dn=(log[e.id]||[]).filter(x=>x&&x.r).length;
+  openSheet(()=>({title:'Sesión',body:'<div class="pad"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Ir a un ejercicio</p><div class="group">'+p.ex.map((e,i)=>{const dn=(log[e.id]||[]).filter(x=>x&&x.r).length;
       return '<button class="cell" onclick="jumpTo('+i+')"><span class="exn'+(dn>=nSteps(e)?' done':'')+'">'+(dn>=nSteps(e)?ic('check',14,2.8):(i+1))+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(e.n)+'</p><p class="fn l2">'+dn+' de '+nSteps(e)+' series</p></div>'+(i===SS.ei?'<span class="pill tint">Ahora</span>':'')+'</div></button>'}).join('')+'</div>'+
-    (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Menos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Más">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio.</p>':''})()+
+    (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Bajar el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Subir el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">Lo que sube la placa o los discos de tu gimnasio.</p>':''})()+
     '<div class="group" style="margin-top:18px"><button class="cell" onclick="'+(SS.paused?'closeSheet();resumeSession()':'pauseSession()')+'"><span class="ic soft">'+ic(SS.paused?'play':'pause',16)+'</span><div class="cb"><div class="tt"><p class="bd">'+(SS.paused?'Seguir':'Pausar la sesión')+'</p><p class="fn l2">El reloj y el descanso se detienen</p></div></div></button>'+
     '<button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
     '<button class="cell" onclick="exitSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div>'+
@@ -1156,7 +1251,8 @@ function renderAcc(){
     '<circle cx="20" cy="20" r="16.5" fill="none" stroke="'+(rest?restCol(L):'var(--tint)')+'" stroke-width="4" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-pct))+'"/></svg>'+
     '<div class="in">'+(rest&&!SS.paused?'':ic(SS.ph==='done'?'check':(SS.paused?'pause':'play'),15))+'</div></div>'+
     '<div class="grow"><p class="fn semi num">'+(SS.ph==='done'?'Sesión completada':SS.paused?'En pausa · '+mmss(activeMs()/1000):(rest?'Descanso · '+mmss(Math.ceil(L)):(SS.wOn?(e&&e.spd?'Cardio · '+mmss(cEl()):'Serie en marcha'):(e&&e.spd&&SS.wAcc?'Cardio en pausa · '+mmss(cEl()):'Siguiente serie'))))+'</p><p class="c1 l2 ell">'+esc(PLAN[SS.day].n)+' · '+esc(e?e.n:'')+'</p></div>'+
-    '<span class="btn sec sm" style="height:38px">Abrir</span>';
+    '<span class="btn sec sm" style="height:38px" aria-hidden="true">Abrir</span>';
+  a.setAttribute('aria-label','Abrir la sesión. '+a.querySelector('.grow').textContent.replace(/(\d+):(\d\d)/,(m,x,y)=>spkT(+x*60+ +y)));
 }
 
 /* tamaño bloqueado, como una app: sin pellizcar para ampliar ni doble toque (Safari ignora user-scalable) */

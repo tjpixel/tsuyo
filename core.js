@@ -385,7 +385,7 @@ const offStep=(w,inc)=>inc>0&&w>0&&Math.abs(w/inc-Math.round(w/inc))>1e-6;
 function advise(e){
   const L=lastFor(e.id);
   const u=e.seg?(e.min?'min':'seg'):'reps';
-  if(!L)return{txt:e.spd?'Primera vez. Ritmo conversacional, RPE 5. Anota la velocidad.':(e.bw?'Primera vez. Haz '+e.lo+' repeticiones controladas y anota cuántas te salen limpias.':'Primera vez. Elige un peso con el que llegues a '+e.lo+' '+u+' a RIR 3.'),up:false,w:''};
+  if(!L)return{txt:e.spd?'Primera vez. Ritmo conversacional, RPE 5. Anota la velocidad.':(e.seg?'Primera vez. Aguanta '+e.lo+(e.min?' minutos':' segundos')+' con buena postura y anota el tiempo.':e.bw?'Primera vez. Haz '+e.lo+' repeticiones controladas y anota cuántas te salen limpias.':'Primera vez. Elige un peso con el que llegues a '+e.lo+' '+u+' a RIR 3.'),up:false,w:''};
   const done=L.sets.filter(x=>x&&x.r);
   const mx=Math.max(...done.map(x=>x.w||0));
   const allTop=done.length>=nSteps(e)&&done.every(x=>x.r>=e.hi);
