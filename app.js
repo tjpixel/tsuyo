@@ -1050,6 +1050,8 @@ function restPill(){
     '<circle id="bgArc" cx="14" cy="14" r="11" fill="none" stroke="'+restCol(L)+'" stroke-width="3.2" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(-C*(1-L/SS.tTot))+'"/></svg></div>'+
     '<span class="tt" id="bgT">Descanso · '+mmss(Math.ceil(L))+'</span><button class="add" onclick="addRest(30)" aria-label="Añadir 30 segundos">+30 s</button></div>';
 }
+/* al empezar el ejercicio preparado (plancha o cardio), el descanso que seguía en la cápsula se da por acabado: no cuentan dos relojes a la vez */
+function dropBgRest(){if(SS.bg){SS.bg=false;SS.tEnd=0;SS.prevL=null}}
 /* fin del descanso en segundo plano: no se vuelve a pintar la pantalla, para no perder el peso que estés escribiendo */
 function endBgRest(done){
   SS.bg=false;SS.tEnd=0;const el=$('bgPill');
@@ -1078,7 +1080,7 @@ function setEff(v){
 /* cardio con cronómetro: cuenta hacia arriba hasta el objetivo (avisa al llegar) y se puede pausar */
 const cEl=()=>Math.floor((SS.wAcc||0)+(SS.wOn?(Date.now()-SS.wStart)/1000:0));
 const cLab=(el,tg)=>el>=tg?'¡Objetivo cumplido!':(SS.wOn||el?'de '+mmss(tg):'objetivo '+mmss(tg));
-function cStart(){SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();renderAcc()}
+function cStart(){dropBgRest();SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();renderAcc()}
 function cPause(){SS.wAcc=cEl();SS.wOn=false;stopTimer();renderSession();renderAcc()}
 function cFinish(){const el=cEl();SS.wOn=false;SS.wAcc=0;SS.cDone=false;stopTimer();if(el<30){renderSession();toast('Menos de 30 s: no se anota');return}SS.mins=Math.max(1,Math.round(el/60));doneSet()}
 function doneSet(){
@@ -1114,7 +1116,7 @@ function fixW(){closeSheet();const el=$('ssW');if(el){el.focus();el.select()}}
 function okW(){SS.wOk=curEx().id+':'+SS.w;closeSheet();doneSet()}
 function swToggle(){
   const e=curEx();
-  if(!SS.wOn){SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();return}
+  if(!SS.wOn){dropBgRest();SS.wOn=true;SS.wStart=Date.now();renderSession();startTick();return}
   const el=Math.floor((Date.now()-SS.wStart)/1000);SS.wOn=false;
   if(el<1){renderSession();return}
   logSet(e,SS.si,{r:el});afterSet(e);
