@@ -378,6 +378,10 @@ function repsTxt(e,sets){
   if(pr.length&&pr.every(p=>p[0]===pr[0][0]&&p[1]===pr[0][0]))return pr[0][0]+' por lado'+(pr.length>1?' en las '+pr.length+' series':'');
   return pr.map(p=>p[0]+'/'+p[1]).join(', ')+' (izq./dcha.)';
 }
+/* ejercicios que se hacen en máquina o polea: solo en estos se habla de «tu máquina».
+   El resto (barra, mancuernas, kettlebell, disco sobre la cadera…) habla de saltos de peso. */
+const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','crunchpol']);
+const isMaq=e=>!!(e&&MAQ.has(e.id));
 /* peso que existe en la máquina: múltiplo del salto (placa 6 → 6, 12, 18…) */
 const r2=x=>Math.round(x*100)/100;
 function snapW(w,inc){if(!(inc>0)||!(w>0))return w;return r2(Math.max(inc,Math.round(w/inc)*inc))}
@@ -438,7 +442,7 @@ function advise(e){
   }
   if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:'Techo alcanzado. Sube a <b>'+nw+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
   if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
-  if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',',')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
+  if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. '+(isMaq(e)?'Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',','):'Vas en saltos de '+String(e.inc).replace('.',',')+' kg')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
   return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
 }
 
