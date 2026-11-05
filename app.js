@@ -158,9 +158,9 @@ function segLab(e,el){
 const unitOf=e=>e.seg?(e.min?'min':'s'):'reps';
 function exLine(e){
   const a=advise(e),u=unitOf(e);
-  const rng=e.lo===e.hi?e.hi:(e.lo+'–'+e.hi);
+  const rng=a.lt||a.lr||(e.lo===e.hi?e.hi:(e.lo+'–'+e.hi));
   let w='';
-  if(e.spd)w='';else if(!e.bw&&a.w)w=' · '+a.w+' kg';
+  if(e.spd)w=a.sp?' · '+fmtSp(a.sp)+' km/h':'';else if(!e.bw&&a.w)w=' · '+fmtSp(a.w)+' kg';
   return (e.s>1?e.s+' × ':'')+rng+' '+u+(e.side?' por lado':'')+w;
 }
 function setsDoneToday(n){const log=DB.sess[T()]?.ex||{};let k=0;(PLAN[n]?.ex||[]).forEach(e=>(log[e.id]||[]).forEach(s=>{if(s&&s.r)k++}));return k}
@@ -448,7 +448,7 @@ const GUIDES={
   prog:{t:'Cómo progresar',i:'up',h:'<p>Cada ejercicio tiene un <b>rango</b> de repeticiones, por ejemplo 8–12.</p><ul><li>Cada sesión intentas <b>sumar repeticiones</b> con el mismo peso.</li><li>Cuando llegas al tope del rango <b>en todas las series</b>, subes peso.</li><li>Al subir, vuelves al extremo bajo del rango. Y otra vez.</li></ul><p>Tsuyo hace las cuentas: cuando toque subir, lo verás en Hoy con el peso propuesto.</p>'},
   descanso:{t:'Cuánto descansar',i:'clock',h:'<ul><li><b>Básicos pesados</b> (sentadilla, prensa, hip thrust…): 2,5–3 min.</li><li><b>Máquinas y mancuernas</b> de empuje y tirón: 2–2,5 min.</li><li><b>Aislados</b> (femoral, laterales, bíceps…): 1–1,5 min.</li><li><b>Core</b>: 60–90 s.</li><li><b>Después del cardio</b>: 1,5 min, para recuperar el aliento y cambiar de máquina.</li></ul><p>Con más descanso mantienes más carga. Si vas justo de tiempo, quita un ejercicio antes que recortar descansos.</p>'},
   esfuerzo:{t:'Cuánto apretar',i:'bolt',h:'<p>Al anotar cada serie eliges cómo ha ido:</p><ul><li><b>Fácil</b>: te sobraban 3 repeticiones o más. Toca subir.</li><li><b>Bien</b>: te sobraban 1–2. Es tu sitio casi siempre.</li><li><b>Al límite</b>: no salía otra. Solo de vez en cuando, y nunca en los básicos pesados.</li></ul><p>Las primeras 3 semanas, quédate en Fácil o Bien mientras aprendes la técnica.</p>'},
-  ciclo:{t:'El ciclo de 12 semanas',i:'cal',h:'<ul><li><b>Semanas 1–3</b>: aprendizaje. Pesos conservadores.</li><li><b>Semanas 4–8</b>: progresión. Subes casi cada semana.</li><li><b>Semanas 9–10</b>: se frena. Es normal.</li><li><b>Semana 11</b>: semana ligera al 60–70 %. Tsuyo te propone los pesos.</li><li><b>Semana 12</b>: revisión. Aquí sí cambias 1–2 ejercicios.</li></ul>'},
+  ciclo:{t:'El ciclo de 12 semanas',i:'cal',h:'<ul><li><b>Semanas 1–3</b>: aprendizaje. Pesos conservadores.</li><li><b>Semanas 4–8</b>: progresión. Subes casi cada semana.</li><li><b>Semanas 9–10</b>: se frena. Es normal.</li><li><b>Semana 11</b>: semana ligera. Mismos ejercicios, series y descansos con unos 2/3 del esfuerzo, para llegar descansado al bloque siguiente. En cada ejercicio Tsuyo baja una sola cosa y te pone la cifra: el peso al 65 %, la velocidad del cardio al 85 % y, en los de peso corporal o por tiempo, unos 2/3 de tus repeticiones o segundos. Esa semana no sube nada.</li><li><b>Semana 12</b>: revisión. Aquí sí cambias 1–2 ejercicios.</li></ul>'},
   seguridad:{t:'Seguridad',i:'shield',h:'<p>Si tienes una <b>lesión, dolor o una condición médica</b>, consulta antes con un profesional sanitario.</p><p><b>El dolor articular no es esfuerzo.</b> Si una serie molesta en una articulación, para, baja la carga o cambia el ejercicio.</p><p>Tsuyo no sustituye a un entrenador ni a un médico.</p>'}
 };
 function openGuide(k){openSheet(()=>({title:GUIDES[k].t,body:'<div class="prose">'+GUIDES[k].h+'</div>'}))}
@@ -679,7 +679,7 @@ let PLUSP='y';
 function openPlus(){
   openSheet(()=>({title:'',body:'<div style="display:flex;flex-direction:column;align-items:center;padding:0 20px">'+dkStage('suburi',2)+
     '<div class="row" style="gap:8px;margin-top:14px"><span class="brand" style="font-size:22px">Tsuyo</span><span class="pill plus">PLUS</span></div><h2 class="t1 center" style="margin-top:6px">Entrena a tu medida</h2></div>'+
-    '<div class="stack" style="padding:18px 28px 0;gap:14px">'+[['pen','Rutina a medida','Cambia días, series, descansos y ejercicios.'],['cal','Ciclo de 12 semanas','Semana ligera con los pesos ya calculados.'],['chart','Progreso completo','Gráfica por ejercicio e historial sin límite.'],['heart','Nutrición y medidas','Llegarán en las próximas versiones.']].map(([i,t,s])=>
+    '<div class="stack" style="padding:18px 28px 0;gap:14px">'+[['pen','Rutina a medida','Cambia días, series, descansos y ejercicios.'],['cal','Ciclo de 12 semanas','Semana ligera con las cifras ya calculadas.'],['chart','Progreso completo','Gráfica por ejercicio e historial sin límite.'],['heart','Nutrición y medidas','Llegarán en las próximas versiones.']].map(([i,t,s])=>
       '<div class="row" style="gap:13px;align-items:flex-start"><span class="ic soft" style="width:32px;height:32px;border-radius:9px;display:grid;place-items:center">'+ic(i,17)+'</span><div><p class="hl">'+t+'</p><p class="fn l2">'+s+'</p></div></div>').join('')+'</div>'+
     (isPlus()?'<div class="pad stack" style="margin-top:22px"><div class="note"><span>Plus está activo en modo de pruebas. No se ha cobrado nada.</span></div><button class="btn sec danger" onclick="PREF.set(\'plus\',false);closeSheet();render();toast(\'Plus desactivado\')">Desactivar Plus</button></div>'
     :'<div class="pad stack" style="margin-top:22px;gap:8px">'+
@@ -877,6 +877,7 @@ function defaultW(e){
 function defaultR(e){
   const s=setsFor(e);if(s[SS.si]&&s[SS.si].r)return s[SS.si].r;
   if(SS.si>0&&s[SS.si-1]&&s[SS.si-1].r)return s[SS.si-1].r;
+  const lr=lightRepGoal(e);if(lr)return lr;
   const L=lastFor(e.id),q=L&&L.sets[SS.si];return q&&q.r?q.r:e.lo;
 }
 /* orden libre: si dejas un ejercicio para luego (máquina ocupada), las líneas marcan lo hecho de verdad, no la posición.
@@ -926,8 +927,8 @@ function renderSession(){
         '<div class="foot"><button class="btn pri lg" onclick="swToggle()">'+(SS.wOn?ic('stop',22)+'Parar y anotar':ic('play',20)+'Empezar')+'</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
     }else{
       if(SS.w==null)SS.w=defaultW(e);
-      const tgt=e.lo===e.hi?e.hi:e.lo+'–'+e.hi;
-      h+='<div style="flex:1 1 0;min-height:24px"></div>'+(e.bw?'<div class="center"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+'</p></div>'
+      const lr=lightRepGoal(e),tgt=lr?(e.bw?lr:'unas '+lr):(e.lo===e.hi?e.hi:e.lo+'–'+e.hi);
+      h+='<div style="flex:1 1 0;min-height:24px"></div>'+(e.bw?'<div class="center"><p class="fn l2 caps semi">Peso corporal</p><p class="big rnd">'+tgt+'</p><p class="fn l2">repeticiones'+(e.side?' por lado':'')+(lr?' · semana ligera':'')+'</p></div>'
         :'<div style="display:flex;flex-direction:column;align-items:center"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
           '<button class="step" id="ssWm" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Peso en kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
           '<button class="step" id="ssWp" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>')+
@@ -961,10 +962,11 @@ function a11ySess(){
   else if(SS.ph==='set'){
     const e=curEx(),setN=e.side?Math.floor(SS.si/2)+1:SS.si+1,lo=e.lo,hi=e.hi,rng=lo===hi?String(hi):lo+' a '+hi;
     s='. Serie '+setN+' de '+e.s+(e.side?(SS.si%2?', lado derecho':', lado izquierdo'):'');
-    if(e.spd)s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';
+    if(e.spd){s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';if(isLightWk()&&SS.sp)s+=', semana ligera, a '+fmtSp(SS.sp)+' kilómetros por hora'}
     else if(e.seg)s+=SS.wOn?'. Cronómetro en marcha':(lightGoal(e)?'. Semana ligera, aguanta unos '+lightGoal(e)+' segundos. Pulsa Empezar':'. Por tiempo, objetivo '+rng+' segundos. Pulsa Empezar');
-    else if(e.bw)s+='. Peso corporal, objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
-    else s+='. '+(SS.w?spkKg(SS.w):'Sin peso puesto')+', objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
+    else{const lr=lightRepGoal(e),obj=lr?'semana ligera, unas '+lr+' repeticiones':(isLightWk()?'semana ligera, ':'')+'objetivo '+rng+' repeticiones';
+      if(e.bw)s+='. Peso corporal, '+obj+(e.side?' por lado':'');
+      else s+='. '+(SS.w?spkKg(SS.w):'Sin peso puesto')+', '+obj+(e.side?' por lado':'');}
     if(SS.bg&&SS.tEnd)s+='. El descanso sigue: quedan '+spkT((SS.tEnd-Date.now())/1000);
     const sb=box.querySelector('.setbar');if(sb&&sb.parentElement)sb.parentElement.setAttribute('aria-hidden','true');
     wLabels();

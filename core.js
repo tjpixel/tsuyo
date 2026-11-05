@@ -359,7 +359,7 @@ function blockInfo(){
 }
 function weekStartDate(w){return shiftD(DB.cfg.start,(w-1)*7)}
 function phaseOf(b,bw){
-  if(bw===11)return{k:'dl',n:'Semana ligera',h:'Mismos ejercicios y series al 60-70% del peso, RIR 4. La app ya te propone los pesos reducidos.'};
+  if(bw===11)return{k:'dl',n:'Semana ligera',h:'Mismos ejercicios, series y descansos con unos 2/3 del esfuerzo. Tsuyo ya te pone las cifras de cada ejercicio.'};
   if(bw===12)return{k:'rev',n:'Revisión',h:'Repasa tus récords en Progreso y decide qué 1–2 ejercicios cambiar para el siguiente bloque.'};
   if(b===1&&bw<=3)return{k:'learn',n:'Aprendizaje',h:'Técnica primero. Pesos conservadores, RIR 3-4.'};
   if(b>1&&bw===1)return{k:'learn',n:'Reentrada',h:'Vuelves de la semana ligera: recupera tus pesos a RIR 3.'};
@@ -369,7 +369,7 @@ function phaseOf(b,bw){
 function rirTarget(){
   const B=blockInfo();
   if(!B)return{r:'RIR 2',note:''};
-  if(B.bw===11)return{r:'Semana ligera',note:'60-70% del peso, RIR 4'};
+  if(B.bw===11)return{r:'Semana ligera',note:'unos 2/3 del esfuerzo, RIR 4'};
   if(B.b===1&&B.bw<=3)return{r:'RIR 3–4',note:'aprendiendo técnica'};
   if(B.b>1&&B.bw===1)return{r:'RIR 3',note:'reentrada'};
   return{r:'RIR 2',note:B.bw===12?'semana de revisión':''};
@@ -411,15 +411,24 @@ function shortTxt(e,sets,un){
 }
 /* ejercicios que se hacen en máquina o polea: solo en estos se habla de «tu máquina».
    El resto (barra, mancuernas, kettlebell, disco sobre la cadera…) habla de saltos de peso. */
-const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','crunchpol']);
+const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','crunchpol','pallof']);
 const isMaq=e=>!!(e&&MAQ.has(e.id));
 /* peso que existe en la máquina: múltiplo del salto (placa 6 → 6, 12, 18…) */
 const r2=x=>Math.round(x*100)/100;
 function snapW(w,inc){if(!(inc>0)||!(w>0))return w;return r2(Math.max(inc,Math.round(w/inc)*inc))}
 const offStep=(w,inc)=>inc>0&&w>0&&Math.abs(w/inc-Math.round(w/inc))>1e-6;
-/* semana ligera: velocidad de cardio al ~85 % de la última (en saltos de 0,5 km/h)
-   y tiempo de plancha a ~2/3 del mejor tiempo (en saltos de 5 s, o 1 min) */
+/* ═════ SEMANA LIGERA (semana 11 del ciclo) ═════
+   Una sola regla para todos los ejercicios: mismos ejercicios, series y descansos, con unos 2/3 del esfuerzo,
+   para llegar descansado a la revisión y al bloque siguiente sin perder técnica ni costumbre.
+   En cada ejercicio se baja UNA cosa, la que marca lo duro que es, y Tsuyo da la cifra ya puesta:
+   · con carga (máquina, polea, barra, mancuernas, kettlebell, disco) → el peso al ~65 %, en saltos de tu material; mismas reps
+   · cardio → la velocidad al ~85 % (el esfuerzo sube muy deprisa con la velocidad); mismos minutos
+   · por tiempo (plancha, colgarse…) → ~2/3 de tu mejor tiempo, en saltos de 5 s
+   · sin carga (peso corporal, o sin peso anotado la última vez) → ~2/3 de tus mejores repeticiones
+   La referencia es la última sesión normal; en semana ligera no sube nada y la semana 12 vuelve a tus cifras. */
+const isLightWk=()=>{const B=blockInfo();return !!(B&&B.bw===11)};
 const fmtSp=v=>String(v).replace('.',',');
+const pctTxt=(a,b)=>'≈'+Math.round(a/b*100)+'&nbsp;%';
 function lightSpeed(e,L){
   if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r&&x.sp||0));if(!mx)return null;
   return{mx,sp:Math.max(0.5,Math.round(mx*0.85*2)/2)};
@@ -429,34 +438,56 @@ function lightTime(e,L){
   const st=e.min?1:5,t=Math.max(st*(e.min?1:2),Math.round(mx*2/3/st)*st);
   return{mx,t:Math.min(t,mx)};
 }
+function lightReps(e,L){
+  if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r||0));if(!mx)return null;
+  return{mx,t:Math.min(mx,Math.max(1,Math.round(mx*2/3)))};
+}
+/* ¿qué se baja hoy en este ejercicio? 'w' peso · 'sp' velocidad · 't' tiempo · 'r' repeticiones */
+function lightKind(e,L){
+  if(e.spd)return'sp';if(e.seg)return't';
+  const mxw=L?Math.max(0,...L.sets.map(x=>x&&x.r&&x.w||0)):0;
+  return(!e.bw&&e.inc>0&&mxw>0)?'w':'r';
+}
 /* objetivo de tiempo de hoy en semana ligera (null si es semana normal o no hay historial) */
 function lightGoal(e){
-  if(!e||!e.seg||e.spd)return null;const B=blockInfo();if(!B||B.bw!==11)return null;
+  if(!e||!e.seg||e.spd||!isLightWk())return null;
   const lt=lightTime(e,lastFor(e.id));return lt?lt.t:null;
+}
+/* repeticiones de hoy en semana ligera en los ejercicios sin carga (null si no toca) */
+function lightRepGoal(e){
+  if(!e||e.seg||!isLightWk())return null;const L=lastFor(e.id);
+  if(!L||lightKind(e,L)!=='r')return null;const lr=lightReps(e,L);return lr?lr.t:null;
 }
 function advise(e){
   const L=lastFor(e.id);
   const u=e.seg?(e.min?'min':'seg'):'reps';
-  if(!L)return{txt:e.spd?'Primera vez. Ritmo conversacional, RPE 5. Anota la velocidad.':(e.seg?'Primera vez. Aguanta '+e.lo+(e.min?' minutos':' segundos')+' con buena postura y anota el tiempo.':e.bw?'Primera vez. Haz '+e.lo+' repeticiones controladas y anota cuántas te salen limpias.':'Primera vez. Elige un peso con el que llegues a '+e.lo+' '+u+' a RIR 3.'),up:false,w:''};
+  const LW=isLightWk(),SL='<b>Semana ligera.</b> ',pl=e.side?' por lado':'';
+  if(!L){
+    if(LW)return{txt:SL+(e.spd?'Primera vez: ritmo cómodo, RPE&nbsp;4. Anota la velocidad.':(e.seg?'Primera vez: aguanta '+e.lo+(e.min?' minutos':' segundos')+pl+' con buena postura, lejos del límite, y anota el tiempo.':e.bw?'Primera vez: haz '+e.lo+' repeticiones'+pl+' controladas, lejos del límite.':'Primera vez: elige un peso con el que llegues a '+e.lo+' '+u+' a RIR&nbsp;4.')),up:false,w:''};
+    return{txt:e.spd?'Primera vez. Ritmo conversacional, RPE 5. Anota la velocidad.':(e.seg?'Primera vez. Aguanta '+e.lo+(e.min?' minutos':' segundos')+' con buena postura y anota el tiempo.':e.bw?'Primera vez. Haz '+e.lo+' repeticiones controladas y anota cuántas te salen limpias.':'Primera vez. Elige un peso con el que llegues a '+e.lo+' '+u+' a RIR 3.'),up:false,w:''};
+  }
   const done=L.sets.filter(x=>x&&x.r);
   const mx=Math.max(...done.map(x=>x.w||0));
   const allTop=done.length>=nSteps(e)&&done.every(x=>x.r>=e.hi);
-  const Bd=blockInfo();
-  if(Bd&&Bd.bw===11){
-    if(e.spd){
+  /* semana ligera: una sola regla (ver arriba). Cada consejo dice qué se baja, con la cifra y de dónde sale,
+     qué se queda igual y el esfuerzo. La cifra es la que ya viene puesta en la pantalla. */
+  if(LW){
+    const k=lightKind(e,L);
+    if(k==='sp'){
       const ls=lightSpeed(e,L);
-      if(!ls)return{txt:'<b>Semana ligera.</b> Mismo tiempo a ritmo cómodo, RPE 4.',up:false,w:''};
-      return{txt:'<b>Semana ligera.</b> Ponte en <b>'+fmtSp(ls.sp)+' km/h</b> (≈85&nbsp;% de '+fmtSp(ls.mx)+'), mismos minutos, RPE 4.',up:false,w:'',sp:ls.sp};
+      if(!ls)return{txt:SL+'Ritmo cómodo, mismos minutos, RPE&nbsp;4.',up:false,w:''};
+      return{txt:SL+'Ponte en <b>'+fmtSp(ls.sp)+' km/h</b> (≈85&nbsp;% de '+fmtSp(ls.mx)+'), mismos minutos, RPE&nbsp;4.',up:false,w:'',sp:ls.sp};
     }
-    if(e.seg){
-      const lt=lightTime(e,L);
-      if(!lt)return{txt:'<b>Semana ligera.</b> Unos 2/3 del tiempo habitual, lejos del límite.',up:false,w:''};
-      const un=e.min?' min':' s';
-      return{txt:'<b>Semana ligera.</b> Aguanta unos <b>'+lt.t+un+'</b> (2/3 de tus '+lt.mx+un+'), lejos del límite.',up:false,w:'',lt:lt.t};
+    if(k==='t'){
+      const lt=lightTime(e,L),un=e.min?' min':' s';
+      return{txt:SL+'Aguanta unos <b>'+lt.t+un+'</b>'+pl+' (2/3 de tus '+lt.mx+un+'), mismas series, lejos del límite.',up:false,w:'',lt:lt.t};
     }
-    if(e.bw||!e.inc||!mx)return{txt:'<b>Semana ligera.</b> Unas 2/3 de tus repeticiones habituales, RIR 4.',up:false,w:''};
-    const lw=Math.max(e.inc,Math.round(mx*0.65/e.inc)*e.inc);
-    return{txt:'<b>Semana ligera.</b> Usa <b>'+lw+' kg</b> (≈'+Math.round(lw/mx*100)+'% de '+mx+'), mismas series, RIR 4.',up:false,w:lw};
+    if(k==='r'){
+      const lr=lightReps(e,L);
+      return{txt:SL+'Haz unas <b>'+lr.t+' repeticiones</b>'+pl+' (2/3 de tus '+lr.mx+'), mismas series, RIR&nbsp;4.',up:false,w:'',lr:lr.t};
+    }
+    const lw=snapW(mx*0.65,e.inc);
+    return{txt:SL+'Usa <b>'+fmtSp(lw)+' kg</b> ('+pctTxt(lw,mx)+' de '+fmtSp(mx)+'), mismas series y repeticiones, RIR&nbsp;4.',up:false,w:lw};
   }
   if(e.spd){
     const sp=done.map(x=>x.sp).filter(x=>x);
