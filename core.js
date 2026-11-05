@@ -247,7 +247,7 @@ function unskipToday(){
   save();renderHoy();toast('Marca retirada');
 }
 
-function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},sess:{},skips:{},supp:{},diet:{},bodyEnc:null,cfg:{
+function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},wu:{},sess:{},skips:{},supp:{},diet:{},bodyEnc:null,cfg:{
   start:'',k:2000,p:120,f:65,c:220,avail:[1,3,5],force:null,mods:{diet:false,body:false},supps:[]
 }}}
 function mergeDefaults(o){
@@ -255,7 +255,7 @@ function mergeDefaults(o){
   const r=Object.assign(d,o);
   r.cfg=Object.assign(freshDB().cfg,o.cfg||{});
   r.cfg.mods=Object.assign({diet:false,body:false},(o.cfg||{}).mods||{});
-  ['cex','inc','sess','skips','supp','diet','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
+  ['cex','inc','wu','sess','skips','supp','diet','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
   delete r.body;                                  // las medidas nunca viajan en claro
   return sanitizeDB(r);
 }
@@ -276,6 +276,7 @@ function sanitizeDB(r){
   if(['grasa','musculo','fuerza','salud','deporte'].includes(pf.goal))out.profile.goal=pf.goal;
   if(['n0','n1','n2'].includes(pf.lvl))out.profile.lvl=pf.lvl;
   if(pf.done)out.profile.done=1;
+  if(Array.isArray(pf.care)){const c=pf.care.filter((z,i,a)=>typeof z==='string'&&ZONES[z]&&a.indexOf(z)===i);if(c.length)out.profile.care=c}
   if(isObj(pf.deshi)&&window.Deshi)out.profile.deshi=Deshi.cleanLook(pf.deshi);
   // rutina
   out.plan=null;
@@ -296,6 +297,8 @@ function sanitizeDB(r){
     if(e.side)o.side=1;if(e.del)o.del=1;out.cex[id]=o;
   });
   // salto de peso por ejercicio (lo que permite la máquina o los discos de su gimnasio)
+  // calentamiento activado por ejercicio
+  out.wu={};if(isObj(r.wu))Object.entries(r.wu).slice(0,300).forEach(([id,v])=>{if(RX_ID.test(id)&&v)out.wu[id]=1});
   out.inc={};
   if(isObj(r.inc))Object.entries(r.inc).slice(0,300).forEach(([id,v])=>{const n=sNum(v,0.5,50);if(RX_ID.test(id)&&n)out.inc[id]=n});
   // sesiones
@@ -308,6 +311,9 @@ function sanitizeDB(r){
       o.ex[id]=sets.slice(0,40).map(q=>{if(!isObj(q))return null;const z={};
         [['w',0,1000],['r',0,10000],['rir',0,10],['sp',0,50]].forEach(([k,a,b])=>{const v=sNum(q[k],a,b);if(v!=null)z[k]=v});return z});
     });
+    // lo de antes de la primera serie (busca tu peso y calentamiento): aparte, no cuenta como serie
+    if(isObj(x.wu))Object.entries(x.wu).slice(0,40).forEach(([id,q])=>{if(!RX_ID.test(id)||!isObj(q))return;const z={};
+      [['w',0,1000],['r',0,100]].forEach(([k,a,b])=>{const v=sNum(q[k],a,b);if(v!=null)z[k]=v});if(q.p)z.p=1;(o.wu=o.wu||{})[id]=z});
     out.sess[d]=o;
   });
   // saltos, suplementos marcados, dieta
@@ -330,6 +336,8 @@ function sanitizeDB(r){
     mods:{diet:!!(c.mods&&c.mods.diet),body:!!(c.mods&&c.mods.body)},
     supps:(Array.isArray(c.supps)?c.supps:[]).filter(x=>isObj(x)&&RX_ID.test(x.id)).slice(0,30).map(x=>({id:x.id,t:sStr(x.t,40)||'Suplemento',s:sStr(x.s,60)})),
     tour:c.tour?1:0};
+  // primer entreno: día y hora que eligió (para el aviso en Hoy y el calendario)
+  if(isObj(c.first)&&RX_DATE.test(c.first.d)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(c.first.t||''))out.cfg.first={d:c.first.d,t:c.first.t};
   if(!out.cfg.avail.length)out.cfg.avail=f.avail.slice();
   return out;
 }
@@ -413,6 +421,59 @@ function shortTxt(e,sets,un){
    El resto (barra, mancuernas, kettlebell, disco sobre la cadera…) habla de saltos de peso. */
 const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','crunchpol','pallof']);
 const isMaq=e=>!!(e&&MAQ.has(e.id));
+
+/* ═════ ZONAS QUE CUIDAR ═════
+   Opcional (Primeros pasos y Tú). Tsuyo no cambia la rutina: avisa en los ejercicios que cargan esa zona,
+   los marca en el catálogo y sube el peso con más calma (tope dos sesiones seguidas en vez de una). No es consejo médico. */
+const ZONES={espalda:'Espalda',hombro:'Hombro',codo:'Codo',muneca:'Muñeca',cadera:'Cadera',rodilla:'Rodilla',tobillo:'Tobillo'};
+const ZART={espalda:'la espalda',hombro:'el hombro',codo:'el codo',muneca:'la muñeca',cadera:'la cadera',rodilla:'la rodilla',tobillo:'el tobillo'};
+const ZEX={
+ sentadilla:['rodilla','espalda','cadera'],goblet:['rodilla','cadera'],prensa:['rodilla','cadera'],hack:['rodilla'],zancada:['rodilla','cadera','tobillo'],
+ bulgara:['rodilla','cadera'],extcuad:['rodilla'],femoral:['rodilla'],rumano:['espalda','cadera'],gemelo:['tobillo'],
+ hipth:['cadera','espalda'],puente:['cadera'],kickb:['cadera','espalda'],abduc:['cadera'],
+ banca:['hombro','codo','muneca'],pressmanc:['hombro','codo','muneca'],pressp:['hombro','codo'],aperturas:['hombro'],flexiones:['hombro','muneca','codo'],
+ dominadas:['hombro','codo'],jalon:['hombro','codo'],remobarra:['espalda','codo'],remo:['codo'],remopolea:['espalda','codo'],remomanc:['codo'],facepull:['hombro'],
+ militar:['hombro','espalda','codo'],pressh:['hombro','codo'],laterales:['hombro'],curl:['codo','muneca'],triceps:['codo'],
+ plancha:['hombro','espalda'],plancL:['hombro'],crunchpol:['espalda'],elevp:['hombro'],
+ stepup:['rodilla','tobillo'],salto:['rodilla','tobillo'],swing:['espalda','cadera'],colgado:['hombro','muneca']
+};
+/* ejercicios propios: una estimación por grupo muscular */
+const ZGRP={Pierna:['rodilla'],'Glúteo':['cadera'],Pecho:['hombro'],Hombro:['hombro'],Brazos:['codo']};
+function exZones(e){if(!e)return[];if(ZEX[e.id])return ZEX[e.id];return EXC[e.id]?[]:(ZGRP[e.g]||[])}
+function careZones(e){const c=(DB.profile&&DB.profile.care)||[];return c.length?exZones(e).filter(z=>c.includes(z)):[]}
+const zList=zs=>zs.length<2?(zs[0]||''):zs.slice(0,-1).join(', ')+' y '+zs[zs.length-1];
+const zTxt=zs=>zList(zs.map(z=>ZART[z]));
+/* sesión anterior a «before» con este ejercicio (para ver si ya llegó al tope dos veces seguidas) */
+function prevFor(id,before){
+  const ks=Object.keys(DB.sess).filter(k=>k<before&&k!==curDate&&!isDeloadDate(k)).sort().reverse();
+  for(const k of ks){const s=DB.sess[k]?.ex?.[id];if(s&&s.some(x=>x&&x.r))return{d:k,sets:s}}
+  return null;
+}
+function topAt(e,L,w){
+  if(!L)return false;const d=L.sets.filter(x=>x&&x.r);
+  return d.length>=nSteps(e)&&d.every(x=>x.r>=e.hi)&&Math.max(...d.map(x=>x.w||0))>=w;
+}
+
+/* ═════ ANTES DE LA PRIMERA SERIE: «BUSCA TU PESO» Y CALENTAMIENTO ═════
+   Solo en ejercicios con carga (no peso corporal, tiempo ni cardio). Nada de esto cuenta como serie:
+   se guarda aparte (sess[día].wu) y no entra en progreso, récords, peso sugerido ni la pregunta de pesos raros.
+   · Busca tu peso: la primera vez que haces un ejercicio. Pruebas 5 repeticiones tranquilas y eliges
+     Fácil (sube), Este es mi peso o Pesado (baja), siempre en pesos de tu material.
+   · Calentamiento: opcional por ejercicio (lo activa cada uno). 10 repeticiones con la mitad del peso de hoy. */
+const WU_REPS=10,PROBE_REPS=5;
+const BAR=new Set(['sentadilla','banca','remobarra','militar','rumano']);
+const wuOK=e=>!!(e&&e.inc>0&&!e.bw&&!e.seg&&!e.spd&&!e.opt);
+const wuOn=e=>wuOK(e)&&!!(DB.wu||{})[e.id];
+/* la mitad del peso de trabajo, en un peso que exista; si sale igual que el de trabajo, no hay calentamiento que proponer */
+function wuW(e,w){if(!(w>0)||!(e.inc>0))return 0;const x=snapW(w*0.5,e.inc);return x<w?x:0}
+/* primer peso para probar: la barra sola en los ejercicios con barra; si no, dos saltos de tu material */
+const probeStart=e=>BAR.has(e.id)?20:snapW(e.inc*2,e.inc);
+/* subir y bajar al probar: saltos más grandes cuanto más pesa (un 25 % arriba, un 10 % abajo), nunca menos de un salto */
+function probeStep(e,w,d){
+  const inc=e.inc;
+  if(d>0){const n=snapW(w+Math.max(inc,w*0.25),inc);return n>w?n:r2(w+inc)}
+  const n=snapW(w-Math.max(inc,w*0.1),inc);return n<w?n:Math.max(inc,r2(w-inc));
+}
 /* peso que existe en la máquina: múltiplo del salto (placa 6 → 6, 12, 18…) */
 const r2=x=>Math.round(x*100)/100;
 function snapW(w,inc){if(!(inc>0)||!(w>0))return w;return r2(Math.max(inc,Math.round(w/inc)*inc))}
@@ -511,6 +572,9 @@ function advise(e){
   if(e.opt&&!mx){
     if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};
     return{txt:'Última vez sin peso → '+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
+  }
+  if(allTop&&e.inc>0){const cz=careZones(e);
+    if(cz.length&&!topAt(e,prevFor(e.id,L.d),mx)){const sw=snapW(mx,e.inc);return{txt:'Techo alcanzado. Como cuidas '+zTxt(cz)+', <b>repite '+fmtSp(sw)+' kg</b> una sesión más; si vuelves a llegar arriba, subimos.',up:false,w:sw}}
   }
   if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:'Techo alcanzado. Sube a <b>'+nw+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
   if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};

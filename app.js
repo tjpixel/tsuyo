@@ -218,6 +218,7 @@ function renderHoy(){
         :'<button class="btn sec" style="margin-top:12px" onclick="openPickDay()">Entrenar hoy igualmente</button>')+'</div>';
   }
   h+='</div>';
+  h+=firstCard();
   // semana
   if(dayKeys().length){
     h+='<div class="sec"><div class="stitle"><h3 class="t3">Esta semana</h3><span class="fn l2">'+done+' de '+tot+' hechas</span></div>'+
@@ -236,6 +237,55 @@ function renderHoy(){
           (a.up&&!dn?'<span class="pill tint num">'+(a.w?a.w+' kg':'subir')+'</span>':'')+'</div></button>'}).join('')+'</div></div></div>';
   }
   v.innerHTML=h;
+}
+/* ═════ PRIMER ENTRENO ═════
+   Al acabar Primeros pasos se elige día y hora (o «Ahora no»). Mientras no haya ninguna sesión hecha,
+   Hoy lo recuerda con Deshi y deja añadirlo al calendario del móvil con un archivo .ics, que vale en iPhone
+   y Android y no depende de las notificaciones web. En la app nativa será una notificación. */
+const anyDone=()=>Object.keys(DB.sess).some(sessDone);
+const firstDay=()=>dayKeys().includes(1)?1:(dayKeys()[0]||1);
+const whenTxt=d=>d===T()?'Hoy':(d===shiftD(T(),1)?'Mañana':longDate(d));
+const firstDays=()=>Array.from({length:7},(_,i)=>shiftD(T(),i));
+/* propuesta: el primer día de entreno elegido a partir de hoy (hoy solo si aún no son las 20 h) */
+function defFirst(av){const h=new Date().getHours(),ds=firstDays();return ds.find((d,i)=>(i>0||h<20)&&(av||[]).includes(wdOf(d)))||ds[1]}
+function firstPicker(sel,t,js,tv){
+  return '<div class="daysel two" role="group" aria-label="Día">'+firstDays().map((d,i)=>'<button class="'+(d===sel?'on':'')+'" onclick="'+js+'(\''+d+'\')" aria-pressed="'+(d===sel)+'" aria-label="'+(i===0?'Hoy, ':(i===1?'Mañana, ':''))+longDate(d)+'"><small>'+(i===0?'HOY':WDL[wdOf(d)])+'</small><span class="num">'+Number(d.slice(8))+'</span></button>').join('')+'</div>'+
+    '<div class="field" style="margin-top:16px"><label for="fT">Hora</label><input id="fT" type="time" value="'+t+'" oninput="'+tv+'=this.value||'+tv+'"></div>';
+}
+function firstCard(){
+  if(!dayKeys().length||anyDone())return'';
+  const f=DB.cfg.first,gl='<button class="cell" onclick="openGuide(\'inicio\')"><span class="ic gray">'+ic('book',17)+'</span><div class="cb"><div class="tt"><p class="bd">Guía para empezar</p><p class="fn l2">Cómo encontrar tus pesos y qué esperar</p></div>'+chev()+'</div></button>';
+  if(!f)return '<div class="pad" style="margin-top:12px"><div class="group"><button class="cell" onclick="openFirst()"><span class="ic soft">'+ic('cal',17)+'</span><div class="cb"><div class="tt"><p class="bd">Ponle día y hora a tu primer entreno</p><p class="fn l2">Una cita concreta ayuda a empezar</p></div>'+chev()+'</div></button>'+gl+'</div></div>';
+  const late=f.d<T(),k=firstDay();
+  return '<div class="pad" style="margin-top:12px"><div class="card" style="padding:16px 16px 16px 18px"><div class="row" style="align-items:flex-end;gap:10px"><div class="grow" style="padding-bottom:6px">'+
+    '<p class="fn l2">'+(late?'Tu primer entreno se quedó pendiente':'Tu primer entreno')+'</p>'+
+    '<h2 class="t2" style="margin-top:4px">'+(late?'¿Le ponemos otra fecha?':whenTxt(f.d)+' · '+f.t)+'</h2>'+
+    '<p class="sb l2" style="margin-top:2px">'+(late?'Era el '+longDate(f.d).replace(/^[^,]+, /,'')+'. Pasa a todos: elige otro día.':esc(PLAN[k].n)+' · unos '+estMin(k)+' min')+'</p></div>'+dkStage(late?'seiza':'rei',1.5)+'</div>'+
+    '<div class="row" style="margin-top:14px;gap:8px">'+(late?'<button class="btn sec grow" onclick="openFirst()">Elegir otro día</button>'
+      :'<button class="btn sec grow" onclick="addFirstCal()">'+ic('cal',18)+'Añadir a mi calendario</button><button class="btn sec" style="width:98px;flex-shrink:0" onclick="openFirst()">Cambiar</button>')+'</div></div>'+
+    '<div class="group" style="margin-top:10px">'+gl+'</div></div>';
+}
+let FST=null;
+function openFirst(){
+  const f=DB.cfg.first;FST={d:f&&f.d>=T()?f.d:defFirst(DB.cfg.avail),t:f?f.t:'18:00'};
+  openSheet(()=>({title:'Primer entreno',body:'<div class="pad"><p class="sb l2 center balance" style="padding:0 10px 16px">Elige día y hora. Te lo recordamos en Hoy y puedes añadirlo a tu calendario.</p>'+firstPicker(FST.d,FST.t,'fstDay','FST.t')+
+    '<div class="stack" style="margin-top:20px"><button class="btn pri" onclick="saveFirst()">Guardar</button>'+(DB.cfg.first?'<button class="btn tx red" onclick="clearFirst()">Quitar la cita</button>':'')+'</div></div>'}));
+}
+function fstDay(d){FST.d=d;drawSheet();const b=[...document.querySelectorAll('#sheet .daysel button')].find(x=>x.getAttribute('onclick').includes(d));if(b)a11yFocus(b)}
+function saveFirst(){if(!/^\d\d:\d\d$/.test(FST.t||'')){toast('Elige una hora');return}DB.cfg.first={d:FST.d,t:FST.t};save();closeSheet();render();toast('Primer entreno: '+whenTxt(FST.d).toLowerCase()+' a las '+FST.t)}
+function clearFirst(){delete DB.cfg.first;save();closeSheet();render();toast('Cita quitada')}
+/* archivo de calendario con aviso 30 min antes (hora local, sin zona: el móvil la toma como suya) */
+function addFirstCal(){
+  const f=DB.cfg.first;if(!f)return;const k=firstDay(),pd=n=>String(n).padStart(2,'0');
+  const st=new Date(f.d+'T'+f.t+':00'),en=new Date(st.getTime()+estMin(k)*60000);
+  const fmt=x=>x.getFullYear()+pd(x.getMonth()+1)+pd(x.getDate())+'T'+pd(x.getHours())+pd(x.getMinutes())+'00';
+  const ie=t=>String(t).replace(/\\/g,'\\\\').replace(/[,;]/g,m=>'\\'+m).replace(/\n/g,'\\n');
+  const ics=['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//Tsuyo//Primer entreno//ES','CALSCALE:GREGORIAN','METHOD:PUBLISH','BEGIN:VEVENT',
+    'UID:tsuyo-primer-'+f.d+'-'+f.t.replace(':','')+'@tsuyo','DTSTAMP:'+new Date().toISOString().replace(/[-:]/g,'').replace(/\.\d+/,''),
+    'DTSTART:'+fmt(st),'DTEND:'+fmt(en),'SUMMARY:'+ie('Tsuyo · '+PLAN[k].n),'DESCRIPTION:'+ie('Tu primer entreno. Abre Tsuyo y pulsa Empezar: la primera vez de cada ejercicio te ayuda a buscar tu peso.'),
+    'BEGIN:VALARM','ACTION:DISPLAY','DESCRIPTION:'+ie('Tsuyo · primer entreno en 30 minutos'),'TRIGGER:-PT30M','END:VALARM','END:VEVENT','END:VCALENDAR'].join('\r\n');
+  try{const b=new Blob([ics],{type:'text/calendar;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tsuyo-primer-entreno.ics';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Ábrelo para añadirlo a tu calendario')}
+  catch(e){toast('No se pudo crear el archivo')}
 }
 function openTodayMenu(n){
   openSheet(()=>({title:'Sesión de hoy',body:'<div class="pad"><div class="group">'+
@@ -393,10 +443,12 @@ function openExSheet(k,i){
   const stepRow=(lbl,f,val,unit)=>'<div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">'+lbl+'</span>'+(plus?'<button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',-1)" aria-label="Bajar '+lbl.toLowerCase()+', ahora '+val+unit+'">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+val+unit+'</span><button class="mini" style="background:var(--fill2)" onclick="exEdit('+k+','+i+',\''+f+'\',1)" aria-label="Subir '+lbl.toLowerCase()+', ahora '+val+unit+'">'+ic('plus',16,2.4)+'</button>':'<span class="val num">'+val+unit+'</span>')+'</div></div>';
   openSheet(()=>{const e=PLAN[k].ex[i],a=advise(e);return{title:esc(e.n),body:'<div class="pad stack">'+
     '<div class="card" style="padding:14px 16px"><p class="fn l2">Hoy</p><p class="sb" style="margin-top:2px">'+a.txt+'</p>'+(e.tip?'<p class="fn l2" style="margin-top:6px">'+esc(e.tip)+'</p>':'')+'</div>'+
+    (careZones(e).length?'<div class="note"><span>Cuidas <b>'+zTxt(careZones(e))+'</b>. Empieza suave y para si molesta: el dolor en una articulación no es esfuerzo. Aquí el peso sube con más calma.</span></div>':'')+
     '<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Ajustes</p><div class="group">'+stepRow('Series','s',e.s,'')+stepRow(e.seg?'Tiempo mínimo':'Repeticiones mínimas','lo',e.lo,e.seg?(e.min?' min':' s'):'')+stepRow(e.seg?'Tiempo máximo':'Repeticiones máximas','hi',e.hi,e.seg?(e.min?' min':' s'):'')+stepRow('Descanso','r',mmss(e.r),'')+'</div>'+
     (plus?'<div class="row" style="margin-top:10px"><button class="btn sec sm grow" onclick="exReset('+k+','+i+')">Valores por defecto</button><button class="btn sec sm grow danger" onclick="exRemove('+k+','+i+')">Quitar de la sesión</button></div>'
       :'<p class="gfoot" style="padding-left:16px">Con <button class="link" onclick="openPlus()">Plus</button> puedes cambiarlos.</p>')+'</div>'+
     (e.inc>0&&!e.bw?'<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">'+(isMaq(e)?'Tu máquina':'Tu material')+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',-1)" aria-label="Bajar el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+k+','+i+',1)" aria-label="Subir el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">'+(isMaq(e)?'Lo que sube la placa de la máquina. Ej.: si va 6, 12, 18…, pon 6.':'Lo que va de un disco o una mancuerna a la siguiente. Ej.: mancuernas de 2 en 2 (6, 8, 10…), pon 2.')+'</p></div>':'')+
+    (wuOK(e)?'<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Calentamiento</p><div class="group">'+wuCell(e)+'</div><p class="gfoot" style="padding-left:16px">No cuenta como serie ni en tu progreso. Se puede saltar cada día.</p></div>':'')+
     (e.k&&e.k.length?'<div><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Técnica</p><div class="card tech" style="padding:14px 16px">'+(img?'<img src="'+img+'" alt="Técnica de '+esc(e.n)+'" loading="lazy" style="margin-bottom:12px">':'')+
       '<ul class="sb" style="padding-left:18px">'+e.k.map(x=>'<li style="margin-top:4px">'+esc(x)+'</li>').join('')+'</ul></div></div>':'')+
     '</div>'}},true);
@@ -425,7 +477,7 @@ function openCatalog(k){
   openSheet(()=>{const inDay=new Set(PLAN[k].ex.map(e=>e.id)),q=CATQ.toLowerCase();
     return{title:'Añadir ejercicio',body:'<div class="pad"><div class="field" style="margin-bottom:12px"><input id="catQ" placeholder="Buscar" value="'+esc(CATQ)+'" oninput="CATQ=this.value;openSheet(SHS[SHS.length-1],true,true);setTimeout(()=>{const i=$(\'catQ\');i.focus();i.setSelectionRange(i.value.length,i.value.length)},0)" aria-label="Buscar ejercicio"></div>'+
     GROUPS.map(g=>{const ids=Object.keys(EXC).filter(id=>EXC[id].g===g&&(!q||EXC[id].n.toLowerCase().includes(q)));if(!ids.length)return'';
-      return '<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:6px">'+g+'</p><div class="group" style="margin-bottom:12px">'+ids.map(id=>'<button class="cell" onclick="addEx('+k+',\''+id+'\')"'+(inDay.has(id)?' disabled style="opacity:.4"':'')+'><div class="cb" style="padding-left:2px"><span class="tt bd">'+esc(EXC[id].n)+'</span>'+(inDay.has(id)?'<span class="fn l2">En la sesión</span>':ic('plus',18,2.4))+'</div></button>').join('')+'</div>'}).join('')+'</div>'}},true);
+      return '<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:6px">'+g+'</p><div class="group" style="margin-bottom:12px">'+ids.map(id=>'<button class="cell" onclick="addEx('+k+',\''+id+'\')"'+(inDay.has(id)?' disabled style="opacity:.4"':'')+'><div class="cb" style="padding-left:2px"><span class="tt bd">'+esc(EXC[id].n)+'</span>'+(()=>{const cz=careZones({id,g:EXC[id].g});return cz.length?'<span class="pill amb" aria-label="Carga '+esc(zTxt(cz))+'">'+cz.map(z=>ZONES[z]).join(' · ')+'</span>':''})()+(inDay.has(id)?'<span class="fn l2">En la sesión</span>':ic('plus',18,2.4))+'</div></button>').join('')+'</div>'}).join('')+'</div>'}},true);
 }
 function addEx(k,id){DB.plan.days[k-1].ex.push({id});DB.plan.edited=true;save();buildPlan();backSheet();openSheet(SHS[SHS.length-1],true,true);render();toast(EXC[id].n+' añadido')}
 function openTplPicker(){
@@ -445,6 +497,7 @@ function applyTpl(k){DB.plan=planFromTpl(k);PREF.set('force',null);save();buildP
 
 /* ═════ GUÍAS ═════ */
 const GUIDES={
+  inicio:{t:'Tu primer entreno',i:'play',h:'<p>El primer día no va de cuánto mueves, sino de <b>encontrar tu punto de partida</b> y aprender los movimientos.</p><ul><li><b>Busca tu peso.</b> La primera vez que haces un ejercicio, Tsuyo te deja tantear: haz 5 repeticiones tranquilas y elige <b>Fácil · subo</b> o <b>Pesado · bajo</b> hasta dar con un peso con el que llegarías a las repeticiones del rango dejando unas 3 en recámara. Ese será tu peso. Las pruebas no cuentan como series.</li><li><b>Si dudas, el más ligero.</b> Subir es fácil; recuperarse de un tirón, no.</li><li><b>Técnica primero.</b> Toca «Técnica» en cada ejercicio. Mejor un recorrido completo con poco peso que medio recorrido con mucho.</li><li><b>Descansa lo que marca el reloj.</b> Entre series, no apures.</li><li><b>Agujetas.</b> Es normal notarlas 1–3 días. No es una lesión.</li></ul><p>Las primeras 3 semanas son de aprendizaje: Tsuyo te propone pesos conservadores. <b>Si algo duele en una articulación, para.</b> Eso no es esfuerzo.</p>'},
   prog:{t:'Cómo progresar',i:'up',h:'<p>Cada ejercicio tiene un <b>rango</b> de repeticiones, por ejemplo 8–12.</p><ul><li>Cada sesión intentas <b>sumar repeticiones</b> con el mismo peso.</li><li>Cuando llegas al tope del rango <b>en todas las series</b>, subes peso.</li><li>Al subir, vuelves al extremo bajo del rango. Y otra vez.</li></ul><p>Tsuyo hace las cuentas: cuando toque subir, lo verás en Hoy con el peso propuesto.</p>'},
   descanso:{t:'Cuánto descansar',i:'clock',h:'<ul><li><b>Básicos pesados</b> (sentadilla, prensa, hip thrust…): 2,5–3 min.</li><li><b>Máquinas y mancuernas</b> de empuje y tirón: 2–2,5 min.</li><li><b>Aislados</b> (femoral, laterales, bíceps…): 1–1,5 min.</li><li><b>Core</b>: 60–90 s.</li><li><b>Después del cardio</b>: 1,5 min, para recuperar el aliento y cambiar de máquina.</li></ul><p>Con más descanso mantienes más carga. Si vas justo de tiempo, quita un ejercicio antes que recortar descansos.</p>'},
   esfuerzo:{t:'Cuánto apretar',i:'bolt',h:'<p>Al anotar cada serie eliges cómo ha ido:</p><ul><li><b>Fácil</b>: te sobraban 3 repeticiones o más. Toca subir.</li><li><b>Bien</b>: te sobraban 1–2. Es tu sitio casi siempre.</li><li><b>Al límite</b>: no salía otra. Solo de vez en cuando, y nunca en los básicos pesados.</li></ul><p>Las primeras 3 semanas, quédate en Fácil o Bien mientras aprendes la técnica.</p>'},
@@ -529,7 +582,7 @@ function meSheet(){
       '<span class="pill" style="margin-top:8px;background:var(--amber-soft);color:var(--amber)">Cinturón '+C.belt[1].toLowerCase()+'</span></div></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Deshi</p><div class="group">'+row('Aspecto','Piel, pelo y gi','openLook()')+row('Cinturón','Por constancia','openBeltSheet()')+'</div></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Entreno</p><div class="group">'+
-      row('Días de entreno',av.map(d=>WDL[d]).join(', '),'openDays()')+row('Objetivo',p.goal?GOALS[p.goal].n:'—','openPickGoal()')+row('Experiencia',p.lvl?LEVELS[p.lvl].n:'—','openPickLvl()')+'</div></div>'+
+      row('Días de entreno',av.map(d=>WDL[d]).join(', '),'openDays()')+row('Objetivo',p.goal?GOALS[p.goal].n:'—','openPickGoal()')+row('Experiencia',p.lvl?LEVELS[p.lvl].n:'—','openPickLvl()')+row('Zonas que cuidar',(p.care||[]).length?p.care.map(z=>ZONES[z]).join(', '):'Ninguna','openCare()')+'</div></div>'+
     '<div class="pad" style="margin-top:22px"><button class="group" style="display:block;width:100%" onclick="openPlus()"><div class="cell" style="min-height:64px"><span class="ic tint" style="width:34px;height:34px;border-radius:10px">'+ic('star',18)+'</span>'+
       '<div class="cb"><div class="tt"><p class="hl">'+(isPlus()?'Tsuyo Plus activo':'Prueba Tsuyo Plus')+'</p><p class="fn l2">'+(isPlus()?'Simulado en esta versión de pruebas':'7 días gratis · rutina a medida y más')+'</p></div>'+chev()+'</div></div></button></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Apariencia</p><div class="segc" role="group" aria-label="Apariencia">'+
@@ -559,6 +612,12 @@ function openDays(){
 function toggleDay(d){const a=DB.cfg.avail||[];const i=a.indexOf(d);if(i>=0){if(a.length===1){toast('Elige al menos un día');return}a.splice(i,1)}else a.push(d);DB.cfg.avail=a;save();drawSheet();render()}
 function openPickGoal(){openSheet(()=>({title:'Objetivo',body:'<div class="pad stack">'+Object.keys(GOALS).map(k=>optBtn(GOALS[k],DB.profile.goal===k,"setProf('goal','"+k+"')",GOAL_IC[k])).join('')+'</div>'}),true)}
 function openPickLvl(){openSheet(()=>({title:'Experiencia',body:'<div class="pad stack">'+Object.keys(LEVELS).map(k=>optBtn(LEVELS[k],DB.profile.lvl===k,"setProf('lvl','"+k+"')")).join('')+'</div>'}),true)}
+/* zonas que cuidar: opcional; solo sirve para avisar y subir el peso con más calma */
+const careNote='<p class="fn l2" style="padding:14px 6px 0">Tsuyo te avisará en los ejercicios que cargan esa zona, los marcará al añadir ejercicios y subirá el peso con más calma. No sustituye a un profesional: si algo duele, para y consulta. Solo se usa para esto.</p>';
+const zoneBtns=(sel,js)=>'<div class="zsel" role="group" aria-label="Zonas que cuidar">'+Object.keys(ZONES).map(z=>'<button class="'+(sel.includes(z)?'on':'')+'" onclick="'+js+'(\''+z+'\')" aria-pressed="'+sel.includes(z)+'">'+ZONES[z]+'</button>').join('')+'</div>';
+function openCare(){openSheet(()=>({title:'Zonas que cuidar',body:'<div class="pad"><p class="sb l2 center balance" style="padding:0 10px 16px">¿Tienes alguna molestia o una lesión antigua? Márcala. Puedes cambiarlo cuando quieras.</p>'+zoneBtns(DB.profile.care||[],'careTog')+careNote+'</div>'}),true)}
+function careTog(z){const c=(DB.profile.care||[]).slice(),i=c.indexOf(z);if(i>=0)c.splice(i,1);else c.push(z);
+  const pf=Object.assign({},DB.profile);if(c.length)pf.care=c;else delete pf.care;DB.profile=pf;save();drawSheet();render();say(ZONES[z]+(i>=0?', quitada':', marcada'))}
 function setProf(f,v){DB.profile=Object.assign({},DB.profile,{[f]:v});save();backSheet()}
 function downloadData(){
   try{const b=new Blob([JSON.stringify(DB,null,1)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='tsuyo-datos-'+T()+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000)}
@@ -567,7 +626,7 @@ function downloadData(){
 function openPrivacy(){
   openSheet(()=>({title:'Privacidad',body:'<div class="prose fn" style="font-size:15px;line-height:21px">'+
     '<h4>Responsable</h4><p>'+esc(CFG.owner)+' · '+esc(CFG.ownerEmail)+'</p>'+
-    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo.</p>'+
+    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo.</p>'+
     '<h4>Para qué</h4><p>Solo para que registres y consultes tu progreso. No se usa para publicidad ni se cede a nadie.</p>'+
     '<h4>Dónde</h4><p>'+(CLOUD?'En Supabase, en servidores de la '+esc(CFG.region)+'. Cada persona solo accede a sus datos. Una copia queda en tu móvil.':'Esta versión de pruebas guarda los datos solo en este móvil.')+'</p>'+
     '<h4>Tus derechos</h4><p>Puedes descargar tus datos y eliminarlos desde Tú. Para cualquier otra petición escribe a '+esc(CFG.ownerEmail)+'. También puedes reclamar ante la AEPD (aepd.es).</p>'+
@@ -756,26 +815,29 @@ const GOAL_IC={musculo:'dumb',grasa:'flame',fuerza:'bolt',salud:'heart',deporte:
 const optBtn=(o,on,js,icn)=>'<button class="opt'+(on?' on':'')+'" onclick="'+js+'" aria-pressed="'+on+'">'+(icn?'<span class="gi">'+ic(icn,22)+'</span>':'')+
   '<span class="grow"><span class="hl" style="display:block">'+esc(o.n)+'</span>'+(o.s?'<span class="fn l2" style="display:block">'+esc(o.s)+'</span>':'')+'</span><span class="ck">'+(on?ic('check',14,3):'')+'</span></button>';
 let ONB=null;
-function openOnb(){ONB={i:0,goal:DB.profile.goal||'',lvl:DB.profile.lvl||'',av:(DB.cfg.avail||[1,3,5]).slice(),tpl:null};renderOnb();$('onb').classList.add('on')}
+const ONB_ST=['goal','lvl','days','care','routine','when'];
+function openOnb(){ONB={i:0,goal:DB.profile.goal||'',lvl:DB.profile.lvl||'',av:(DB.cfg.avail||[1,3,5]).slice(),tpl:null,care:(DB.profile.care||[]).slice(),fd:null,ft:'18:00'};renderOnb();$('onb').classList.add('on')}
 function onbGo(d){
-  const st=['goal','lvl','days','routine'][ONB.i];
+  const st=ONB_ST[ONB.i];
   if(d>0&&st==='goal'&&!ONB.goal)return toast('Elige un objetivo');
   if(d>0&&st==='lvl'&&!ONB.lvl)return toast('Elige tu experiencia');
   if(d>0&&st==='days'&&!ONB.av.length)return toast('Elige al menos un día');
-  if(d>0&&st==='routine')return finishOnb();
+  if(d>0&&st==='when'){ONB.first={d:ONB.fd,t:ONB.ft};return finishOnb()}
   if(d<0&&ONB.i===0){$('onb').classList.remove('on');if(!DB.profile.done){started=false;S.del(KEY+'_mode');showWelcome()}return}
-  ONB.i+=d;if(ONB.i===3&&!ONB.picked)ONB.tpl=rankTpls({goal:ONB.goal,lvl:ONB.lvl},ONB.av.length)[0];renderOnb();$('onb').scrollTop=0;
+  ONB.i+=d;if(ONB_ST[ONB.i]==='when'&&!ONB.fd)ONB.fd=defFirst(ONB.av);if(ONB_ST[ONB.i]==='routine'&&!ONB.picked)ONB.tpl=rankTpls({goal:ONB.goal,lvl:ONB.lvl},ONB.av.length)[0];renderOnb();$('onb').scrollTop=0;
 }
 function renderOnb(){
-  const st=['goal','lvl','days','routine'][ONB.i];let h='';
+  const st=ONB_ST[ONB.i];let h='';
   const af=document.activeElement,afK=af&&$('onb').contains(af)?af.getAttribute('onclick'):null,sameStep=renderOnb.last===ONB.i;renderOnb.last=ONB.i;
-  const head='<div class="fnav"><button class="ibtn glass" onclick="onbGo(-1)" aria-label="Atrás">'+ic('chevL',22,2.2)+'</button><div class="dots" style="width:132px" role="img" aria-label="Paso '+(ONB.i+1)+' de 4">'+[0,1,2,3].map(i=>'<i class="'+(i<=ONB.i?'on':'')+'"></i>').join('')+'</div><div style="width:44px"></div></div>';
+  const head='<div class="fnav"><button class="ibtn glass" onclick="onbGo(-1)" aria-label="Atrás">'+ic('chevL',22,2.2)+'</button><div class="dots" style="width:132px" role="img" aria-label="Paso '+(ONB.i+1)+' de '+ONB_ST.length+'">'+ONB_ST.map((x,i)=>i).map(i=>'<i class="'+(i<=ONB.i?'on':'')+'"></i>').join('')+'</div><div style="width:44px"></div></div>';
   if(st==='goal')h='<h1 class="lt balance" style="margin-top:24px">¿Qué quieres conseguir?</h1><p class="sb l2" style="margin-top:8px">Con esto elegimos tu rutina. Puedes cambiarlo cuando quieras.</p><div class="stack" style="margin-top:24px;gap:10px">'+
     Object.keys(GOALS).map(k=>optBtn({n:GOALS[k].n,s:{grasa:'Bajar grasa sin perder músculo',musculo:'Aumentar masa muscular',fuerza:'Mover más peso en los básicos',salud:'Moverme y sentirme bien',deporte:'Pádel, fútbol, artes marciales…'}[k]},ONB.goal===k,"ONB.goal='"+k+"';renderOnb()",GOAL_IC[k])).join('')+'</div>';
   if(st==='lvl')h='<h1 class="lt balance" style="margin-top:24px">¿Cuánto has entrenado?</h1><p class="sb l2" style="margin-top:8px">Así ajustamos la rutina y los primeros pesos.</p><div class="stack" style="margin-top:24px;gap:10px">'+
     Object.keys(LEVELS).map(k=>optBtn(LEVELS[k],ONB.lvl===k,"ONB.lvl='"+k+"';renderOnb()")).join('')+'</div>';
   if(st==='days')h='<h1 class="lt balance" style="margin-top:24px">¿Qué días puedes entrenar?</h1><p class="sb l2" style="margin-top:8px">Si un día no puedes, Tsuyo mueve la sesión sola.</p><div class="daysel" style="margin-top:28px">'+
     [1,2,3,4,5,6,0].map(d=>'<button class="'+(ONB.av.includes(d)?'on':'')+'" onclick="onbDay('+d+')" aria-label="'+DIAS[d].replace(/^./,c=>c.toUpperCase())+'" aria-pressed="'+ONB.av.includes(d)+'">'+WDL[d]+'</button>').join('')+'</div><p class="fn l2 center" style="margin-top:12px">'+ONB.av.length+' día'+(ONB.av.length===1?'':'s')+' a la semana</p>';
+  if(st==='care')h='<h1 class="lt balance" style="margin-top:24px">¿Alguna zona que cuidar?</h1><p class="sb l2" style="margin-top:8px">Opcional. Si tienes una molestia o una lesión antigua, márcala.</p><div style="margin-top:24px">'+zoneBtns(ONB.care,'onbCare')+'</div>'+careNote;
+  if(st==='when')h='<div class="row" style="align-items:flex-end;margin-top:16px"><div class="grow" style="padding-bottom:6px"><h1 class="lt balance">¿Cuándo es tu primer entreno?</h1><p class="sb l2 balance" style="margin-top:8px">Ponerle día y hora ayuda a que no se quede en «ya empezaré».</p></div>'+dkStage('rei',1.8)+'</div><div style="margin-top:22px">'+firstPicker(ONB.fd,ONB.ft,'onbFD','ONB.ft')+'</div><p class="fn l2" style="padding:12px 6px 0">Te lo recordamos en Hoy y podrás añadirlo a tu calendario. Puedes cambiarlo cuando quieras.</p>';
   if(st==='routine'){
     const t=TPLS[ONB.tpl],rec=rankTpls({goal:ONB.goal,lvl:ONB.lvl},ONB.av.length)[0]===ONB.tpl;
     const days=ONB.av.slice().sort((a,b)=>((a+6)%7)-((b+6)%7));
@@ -787,11 +849,13 @@ function renderOnb(){
       '<p class="fn l2" style="padding:10px 16px 0">Podrás cambiar los días y la rutina cuando quieras.</p>';
   }
   $('onb').innerHTML='<div class="fullin">'+head+h+'<div class="foot">'+(st==='routine'?'<button class="btn tx" onclick="onbOthers()">Ver otras rutinas</button>':'')+
-    '<button class="btn pri" onclick="onbGo(1)">'+(st==='routine'?'Empezar a entrenar':'Continuar')+'</button></div></div>';
+    '<button class="btn pri" onclick="onbGo(1)">'+(st==='when'?'Guardar y empezar':(st==='care'&&!ONB.care.length?'Ninguna, continuar':'Continuar'))+'</button>'+(st==='when'?'<button class="btn tx" onclick="finishOnb()">Ahora no</button>':'')+'</div></div>';
   /* lector de pantalla: al cambiar de paso, al título; al marcar una opción, se queda en ella */
   const box=$('onb'),back=sameStep&&afK?[...box.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===afK):null;
   if($('onb').classList.contains('on')||back){a11ySync();a11yFocus(back||box.querySelector('h1'))}
 }
+function onbCare(z){const i=ONB.care.indexOf(z);if(i>=0)ONB.care.splice(i,1);else ONB.care.push(z);renderOnb()}
+function onbFD(d){ONB.fd=d;renderOnb()}
 function onbDay(d){const i=ONB.av.indexOf(d);if(i>=0)ONB.av.splice(i,1);else ONB.av.push(d);renderOnb()}
 function onbOthers(){
   const p={goal:ONB.goal,lvl:ONB.lvl},nd=ONB.av.length,order=rankTpls(p,nd),bd=tplBadges(p,nd);
@@ -801,6 +865,8 @@ function onbOthers(){
 }
 function finishOnb(){
   DB.profile=Object.assign({},DB.profile,{goal:ONB.goal,lvl:ONB.lvl,done:1});
+  if(ONB.care.length)DB.profile.care=ONB.care.slice();else delete DB.profile.care;
+  if(ONB.first)DB.cfg.first=ONB.first;
   DB.cfg.avail=ONB.av.slice();
   if(!DB.plan||DB.plan.src!==ONB.tpl)DB.plan=planFromTpl(ONB.tpl);
   if(!DB.cfg.start)DB.cfg.start=T();
@@ -818,7 +884,7 @@ const effKind=e=>e.spd?'car':(e.seg?'rpe':'rir');
 function openSession(day){
   if(SS.on&&SS.day===day){expandSession();return}
   const p=PLAN[day],log=DB.sess[T()]?.ex||{};
-  SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.past=[];SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
+  SS.on=true;SS.min=false;SS.bg=false;SS.wAcc=0;SS.cDone=false;SS.wOn=false;SS.day=day;SS.ei=0;SS.si=0;SS.past=[];SS.preSkip=[];SS.preRest=false;SS.wKey=null;SS.pn=1;SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;stopTimer();
   let found=false;
   outer:for(let i=0;i<p.ex.length;i++){const e=p.ex[i],s=log[e.id]||[];for(let j=0;j<nSteps(e);j++)if(!(s[j]&&s[j].r)){SS.ei=i;SS.si=j;found=true;break outer}}
   const st=PREF.get('sess',null),same=st&&st.d===T()&&st.n===day;
@@ -871,6 +937,7 @@ const setsFor=e=>DB.sess[T()]?.ex?.[e.id]||[];
 function defaultW(e){
   const s=setsFor(e),q=s[SS.si];if(q&&q.w!=null)return q.w;
   if(SS.si>0&&s[SS.si-1]&&s[SS.si-1].w!=null)return s[SS.si-1].w;
+  const pw=DB.sess[T()]?.wu?.[e.id];if(pw&&pw.p&&pw.w)return pw.w;   // el peso que encontraste hoy al tantear
   const a=advise(e);if(a.w!=='')return a.w;
   return e.opt?0:null;
 }
@@ -901,13 +968,15 @@ function renderSession(){
   if(SS.paused){renderPaused();return}
   const e=curEx(),u=unitOf(e),side=e.side?(SS.si%2?' · Derecha':' · Izquierda'):'',setN=e.side?Math.floor(SS.si/2)+1:SS.si+1;
   const top=sessHead()+'<div style="margin-top:10px">'+sessDots()+'</div>'+(SS.ph==='set'&&SS.bg?restPill():'');
-  if(SS.ph==='set'){
-    const a=advise(e);
+  if(SS.ph==='set'&&preKind(e)){
+    h=top+preHtml(e,preKind(e));
+  }else if(SS.ph==='set'){
+    const a=probedAdvise(e);
     h=top+'<h1 class="lt balance" style="margin-top:26px">'+esc(e.n)+'</h1>'+
       '<div class="row" style="margin-top:14px;gap:12px;align-items:center"><div class="grow" style="min-width:0">'+(e.s>1||e.side?setBar(e,setN)+'<p class="fn l2" style="margin-top:7px;white-space:nowrap">Serie '+setN+' de '+e.s+'<span class="amb">'+side+'</span></p>':'')+'</div>'+
       (e.k&&e.k.length?'<button class="pill" style="height:32px;padding:0 12px;border-radius:16px;background:var(--fill2);color:var(--label);font-size:13px" onclick="openExSheet('+SS.day+','+SS.ei+')">'+ic('book',15)+'Técnica</button>':'')+'</div>'+
       '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start">'+(a.up?'<span class="ic tint" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('up',18,2.6)+'</span>':'<span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('chart',17)+'</span>')+
-      '<p class="sb grow">'+a.txt+'</p></div>';
+      '<div class="grow"><p class="sb">'+a.txt+'</p>'+careLine(e)+'</div></div>';
     if(e.spd){
       if(SS.mins==null)SS.mins=e.hi;if(SS.sp==null){if(a.sp)SS.sp=a.sp;else{const L=lastFor(e.id);SS.sp=L?Math.max(0,...L.sets.map(x=>x&&x.sp||0))||null:null}}
       const el=cEl(),R=80,C=2*Math.PI*R,tg=SS.mins*60,st=SS.wOn?'run':(el>0?'pause':'idle');
@@ -940,7 +1009,7 @@ function renderSession(){
     const hard=A&&A.rir!=null&&EFF[kind][2][0]===A.rir;
     const nx=nextLabel();
     const R=82,C=2*Math.PI*R,L=SS.tEnd?Math.max(0,(SS.tEnd-Date.now())/1000):0;
-    h=top+'<p class="fn l2" style="margin-top:22px">'+(SS.ann?esc(ae.n)+' · serie '+(ae.side?Math.floor(SS.ann.si/2)+1:SS.ann.si+1)+' hecha':'')+'</p><h1 class="lt" style="margin-top:2px">'+(SS.last?'¡Última serie!':(SS.sw?'Cambio de lado':'Descanso'))+'</h1>'+
+    h=top+'<p class="fn l2" style="margin-top:22px">'+(SS.ann?esc(ae.n)+' · serie '+(ae.side?Math.floor(SS.ann.si/2)+1:SS.ann.si+1)+' hecha':(SS.preRest?esc(e.n)+' · '+(SS.preK==='probe'?'tu peso: '+fmtSp(defaultW(e))+' kg':'calentamiento hecho'):''))+'</p><h1 class="lt" style="margin-top:2px">'+(SS.last?'¡Última serie!':(SS.sw?'Cambio de lado':'Descanso'))+'</h1>'+
       '<div style="flex:1 1 0;min-height:22px"></div><div class="row" style="justify-content:center;gap:24px">'+'<div id="restDk" style="align-self:flex-end;margin-bottom:12px;width:108px;height:150px;display:flex;align-items:flex-end;justify-content:center">'+dkStage(hard?'tired':'seiza',1.75)+'</div>'+
       '<div class="ring" style="width:176px;height:176px"><svg width="176" height="176" viewBox="0 0 176 176" aria-hidden="true"><circle cx="88" cy="88" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
       '<circle id="rArc" cx="88" cy="88" r="'+R+'" fill="none" stroke="'+(SS.last?'var(--tint)':restCol(L))+'" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+(SS.last?0:-C*(1-(SS.tTot?L/SS.tTot:0)))+'"/></svg>'+
@@ -959,6 +1028,12 @@ function a11ySess(){
   H.id='ssH';let s='';
   if(SS.ph==='done'){const p=H.nextElementSibling;if(p){s='. '+p.textContent;p.setAttribute('aria-hidden','true')}}
   else if(SS.paused){const p=H.nextElementSibling;if(p){s='. '+p.textContent+'. Pulsa Seguir para continuar';p.setAttribute('aria-hidden','true')}}
+  else if(SS.ph==='set'&&preKind(curEx())){
+    const pk=preKind(curEx()),kg=SS.w?spkKg(SS.w):'Sin peso puesto';
+    s=pk==='probe'?'. Busca tu peso, prueba '+(SS.pn||1)+'. '+kg+'. Haz '+PROBE_REPS+' repeticiones tranquilas y elige: Pesado, bajo; Fácil, subo; o Este es mi peso. No cuenta como serie':'. Serie de calentamiento. '+kg+', '+WU_REPS+' repeticiones tranquilas. No cuenta como serie';
+    const cz=careZones(curEx());if(cz.length)s+='. Cuidas '+zTxt(cz)+': empieza suave';
+    wLabels();
+  }
   else if(SS.ph==='set'){
     const e=curEx(),setN=e.side?Math.floor(SS.si/2)+1:SS.si+1,lo=e.lo,hi=e.hi,rng=lo===hi?String(hi):lo+' a '+hi;
     s='. Serie '+setN+' de '+e.s+(e.side?(SS.si%2?', lado derecho':', lado izquierdo'):'');
@@ -977,7 +1052,7 @@ function a11ySess(){
   }
   if(s){const sp=document.createElement('span');sp.className='sr';sp.textContent=s.replace(/\s+·\s+/g,', ').replace(/–/g,' a ');H.appendChild(sp)}
   a11yTimers();
-  const k=[SS.ph,SS.ei,SS.si,SS.last,SS.paused,SS.sw].join('|');
+  const k=[SS.ph,SS.ei,SS.si,SS.last,SS.paused,SS.sw,SS.ph==='set'?preKind(curEx()):'',SS.preRest].join('|');
   if(k!==SS.a11yK&&!$('sheet').classList.contains('on')){SS.a11yK=k;a11ySync();a11yFocus(H)}
   /* mismo paso redibujado (por ejemplo, Empezar → Parar en la plancha): el lector se queda en el mismo botón o en el principal */
   else if(SS.a11yAf&&(document.activeElement===document.body||!document.activeElement)){const b=[...box.querySelectorAll('[onclick]')].find(x=>x.getAttribute('onclick')===SS.a11yAf)||box.querySelector('.foot .btn.pri');a11yFocus(b||H)}
@@ -1034,6 +1109,7 @@ function wLabels(){const m=$('ssWm'),p=$('ssWp');if(m)m.setAttribute('aria-label
 function nextLabel(){
   const p=PLAN[SS.day],e=curEx();
   if(SS.last)return null;
+  if(SS.preRest)return (e.side?'Serie 1 de '+e.s+', lado izquierdo':'Serie 1 de '+e.s)+' · '+fmtSp(defaultW(e)??'—')+' kg';
   if(SS.si<nSteps(e)-1){const n=e.side?Math.floor((SS.si+1)/2)+1:SS.si+2;return (e.side&&SS.si%2===0?'Lado derecho':'Serie '+n+' de '+e.s)+(e.bw||e.seg?'':' · '+(SS.w==null?'—':SS.w)+' kg')}
   const ni=nextPend(),ne=ni<0?null:p.ex[ni];return ne?esc(ne.n):null;
 }
@@ -1044,7 +1120,7 @@ const restCol=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--warn)':'var(--tint)');
 const restTxt=L=>L<=3.05?'var(--red)':(L<=10.05?'var(--amber)':'');
 function restBuzz(L){const p=SS.prevL;SS.prevL=L;if(p==null)return;if((p>10&&L<=10)||(p>3&&L<=3))try{navigator.vibrate&&navigator.vibrate(60)}catch(e){}
   if(p>10&&L<=10)say('Quedan 10 segundos de descanso')}
-function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&nextPend()>=0}
+function prepOK(){const p=PLAN[SS.day],e=curEx();return SS.ph==='rest'&&!SS.last&&!SS.sw&&!SS.preRest&&SS.tEnd>Date.now()&&SS.si>=nSteps(e)-1&&nextPend()>=0}
 function prepBtn(){
   if(!prepOK())return'';const ne=PLAN[SS.day].ex[nextPend()];
   return '<button class="prepbtn" onclick="prepNext()"><span class="pi">'+ic('chevR',18,2.6)+'</span><span class="grow" style="min-width:0"><span class="hl ell" style="display:block">Preparar '+esc(ne.n)+'</span><span class="fn l2" style="display:block">El descanso sigue contando</span></span></button>';
@@ -1103,6 +1179,76 @@ function doneSet(){
   }
   afterSet(e);
 }
+/* ═════ ANTES DE LA PRIMERA SERIE (ver core.js) ═════
+   «Busca tu peso» la primera vez de cada ejercicio con carga; calentamiento si lo has activado en ese ejercicio.
+   Se guarda aparte (sess[día].wu): no es una serie y no cuenta en progreso, récords ni peso sugerido. */
+/* tras «Busca tu peso», la serie 1 ya no es «primera vez, elige un peso»: dice el que has encontrado */
+function probedAdvise(e){
+  const a=advise(e),pw=DB.sess[T()]?.wu?.[e.id];
+  if(lastFor(e.id)||!pw||!pw.p)return a;
+  return Object.assign({},a,{txt:'Has encontrado tu peso: <b>'+fmtSp(pw.w)+' kg</b>. Haz '+(e.lo===e.hi?e.hi:e.lo+'–'+e.hi)+' repeticiones'+(e.side?' por lado':'')+' dejando unas 3 en recámara. Si te sobran muchas, la próxima vez subimos.',w:pw.w});
+}
+function workW(e){const a=advise(e);return a.w!==''&&a.w!=null?Number(a.w):0}
+function preKind(e){
+  if(!e||!wuOK(e)||SS.si!==0||SS.wOn)return null;
+  if(setsFor(e).some(x=>x&&x.r))return null;
+  if(DB.sess[T()]?.wu?.[e.id])return null;
+  if((SS.preSkip||[]).includes(e.id))return null;
+  if(!lastFor(e.id))return'probe';
+  if(wuOn(e)&&wuW(e,workW(e))>0)return'warm';
+  return null;
+}
+/* aviso discreto si el ejercicio carga una zona que cuidas */
+function careLine(e){const cz=careZones(e);return cz.length?'<p class="fn amb" style="margin-top:6px">Cuidas '+zTxt(cz)+': empieza suave y para si molesta.</p>':''}
+function preHtml(e,pk){
+  const key=pk+':'+e.id,probe=pk==='probe',ww=workW(e);
+  if(SS.wKey!==key||SS.w==null){SS.w=probe?probeStart(e):wuW(e,ww);SS.wKey=key;SS.pn=1}
+  const txt=probe
+    ?'<b>Primera vez con este ejercicio.</b> Busquemos tu peso: haz '+PROBE_REPS+' repeticiones tranquilas y dime cómo ha ido. Buscamos uno con el que llegues a '+e.lo+' repeticiones'+(e.side?' por lado':'')+' dejando 3 en recámara.'+(SS.pn>=4?' <b>No hace falta afinar del todo</b>: si dudas, quédate con el más ligero.':'')
+    :'Antes de la serie 1: <b>'+WU_REPS+' repeticiones tranquilas</b> con la mitad de tu peso de hoy ('+fmtSp(ww)+'&nbsp;kg). Prepara el movimiento sin cansarte.';
+  return '<h1 class="lt balance" style="margin-top:26px">'+esc(e.n)+'</h1>'+
+    '<div class="row" style="margin-top:14px;gap:12px;align-items:center"><div class="grow" style="min-width:0"><span class="pill '+(probe?'tint':'amb')+'">'+(probe?'Busca tu peso · prueba '+SS.pn:'Calentamiento')+'</span></div>'+
+      (e.k&&e.k.length?'<button class="pill" style="height:32px;padding:0 12px;border-radius:16px;background:var(--fill2);color:var(--label);font-size:13px" onclick="openExSheet('+SS.day+','+SS.ei+')">'+ic('book',15)+'Técnica</button>':'')+'</div>'+
+    '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start"><span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic(probe?'bolt':'flame',17)+'</span>'+
+      '<div class="grow"><p class="sb">'+txt+'</p>'+careLine(e)+'</div></div>'+
+    '<div style="flex:1 1 0;min-height:24px"></div><div style="display:flex;flex-direction:column;align-items:center"><p class="fn l2 caps semi">Peso</p><div class="row" style="gap:22px;margin-top:6px">'+
+      '<button class="step" id="ssWm" onclick="adjW(-1)" aria-label="Quitar peso">'+ic('minus',22,2.4)+'</button><div class="row" style="align-items:baseline;gap:4px;justify-content:center"><input id="ssW" class="big rnd" type="number" inputmode="decimal" step="any" placeholder="0" value="'+(SS.w==null?'':SS.w)+'" oninput="SS.w=this.value===\'\'?null:parseFloat(this.value);fitW(this)" aria-label="Peso en kilos" style="width:150px;text-align:center;background:none;border:0;outline:none;padding:0"><span class="t3 l2">kg</span></div>'+
+      '<button class="step" id="ssWp" onclick="adjW(1)" aria-label="Añadir peso">'+ic('plus',22,2.4)+'</button></div></div>'+
+    '<p class="sb l2 center num" style="margin-top:36px"><span class="semi" style="color:var(--label)">'+(probe?PROBE_REPS:WU_REPS)+' reps'+(e.side?' por lado':'')+'</span> · sin apurar · no cuenta como serie</p><div style="flex:1.7 1 0"></div>'+
+    '<div class="foot">'+(probe
+      ?'<div class="row" style="gap:10px"><button class="btn sec grow" onclick="probeAdj(-1)">'+ic('minus',18,2.4)+'Pesado · bajo</button><button class="btn sec grow" onclick="probeAdj(1)">'+ic('plus',18,2.4)+'Fácil · subo</button></div>'+
+        '<button class="btn pri lg" onclick="preDone()">'+ic('check',22,2.6)+'Este es mi peso</button><button class="btn tx" onclick="preSkip()">Ya sé qué peso usar</button>'
+      :'<button class="btn pri lg" onclick="preDone()">'+ic('check',22,2.6)+'Calentamiento hecho</button><button class="btn tx" onclick="preSkip()">Saltar calentamiento</button>')+'</div>';
+}
+/* tanteo: «Fácil» sube, «Pesado» baja, siempre en pesos de tu material; no se anota nada hasta «Este es mi peso» */
+function probeAdj(d){
+  const e=curEx();if(!(SS.w>0))SS.w=probeStart(e);
+  SS.w=probeStep(e,SS.w,d);SS.pn=(SS.pn||1)+1;renderSession();
+  say((d>0?'Sube a ':'Baja a ')+spkKg(SS.w)+'. Prueba '+SS.pn);
+}
+function logPre(e,val){
+  const d=T();DB.sess[d]=DB.sess[d]||{day:SS.day,ex:{}};DB.sess[d].day=SS.day;
+  DB.sess[d].wu=DB.sess[d].wu||{};DB.sess[d].wu[e.id]=val;save();
+}
+function preDone(){
+  const e=curEx(),pk=preKind(e);if(!pk)return;
+  if(!(SS.w>0)){toast('Pon el peso que has usado');return}
+  logPre(e,pk==='probe'?{w:SS.w,r:PROBE_REPS,p:1}:{w:SS.w,r:WU_REPS});
+  SS.preK=pk;SS.wKey=null;SS.w=pk==='probe'?SS.w:null;           // al tantear, ese es tu peso para la serie 1
+  SS.ann=null;SS.last=0;SS.sw=false;SS.bg=false;SS.preRest=true;
+  const rest=pk==='probe'?90:60;SS.prevL=null;SS.ph='rest';SS.tTot=rest;SS.tEnd=Date.now()+rest*1000;startTick();renderSession();renderAcc();
+}
+function preSkip(){const e=curEx();SS.preSkip=(SS.preSkip||[]).concat(e.id);SS.wKey=null;SS.w=null;renderSession();renderAcc()}
+/* calentamiento: lo activa cada uno en cada ejercicio (hoja del ejercicio o menú de la sesión) */
+function wuToggle(id){
+  DB.wu=DB.wu||{};const on=!DB.wu[id];if(on)DB.wu[id]=1;else delete DB.wu[id];save();
+  drawSheet();say(on?'Calentamiento activado':'Calentamiento desactivado');
+  if(SS.on&&!SS.min&&curEx()&&curEx().id===id&&SS.ph==='set'){SS.wKey=null;SS.w=null;renderSession()}
+}
+function wuCell(e){
+  const on=!!(DB.wu||{})[e.id];
+  return '<button class="cell" role="switch" aria-checked="'+on+'" onclick="wuToggle(\''+e.id+'\')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd">Serie de calentamiento</p><p class="fn l2">'+WU_REPS+' reps con la mitad del peso, antes de la serie 1</p></div><span class="sw'+(on?' on':'')+'" aria-hidden="true"></span></div></button>';
+}
 /* peso de referencia de un ejercicio: la mediana de lo anotado en sus últimas 8 sesiones (un error suelto no la mueve) */
 function refW(e){
   const v=[];let n=0;
@@ -1141,6 +1287,7 @@ function afterSet(e){
 }
 function advance(){
   const p=PLAN[SS.day],e=curEx();stopTimer();SS.tEnd=0;SS.sw=false;SS.bg=false;
+  if(SS.preRest){SS.preRest=false;SS.ph='set';SS.ann=null;return}   // tras tantear o calentar, a la serie 1 del mismo ejercicio
   if(SS.si<nSteps(e)-1){SS.si++}
   else if(nextPend()>=0){SS.past=SS.past||[];if(!SS.past.includes(SS.ei))SS.past.push(SS.ei);const ni=nextPend();SS.ei=ni;SS.si=firstStep(ni);SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false}
   else{SS.ph='done';return}
@@ -1209,7 +1356,7 @@ function sessLogged(){const ex=DB.sess[T()]?.ex||{};return PLAN[SS.day].ex.reduc
 const loggedTxt=n=>n?'Se borran '+(n===1?'la serie anotada':'las '+n+' series anotadas')+' hoy en esta rutina. ':'';
 function wipeToday(){
   const d=T(),s=DB.sess[d];if(!s)return;
-  PLAN[SS.day].ex.forEach(e=>{if(s.ex)delete s.ex[e.id]});
+  PLAN[SS.day].ex.forEach(e=>{if(s.ex)delete s.ex[e.id];if(s.wu)delete s.wu[e.id]});
   if(!s.ex||!Object.keys(s.ex).length)delete DB.sess[d];
   save();
 }
@@ -1241,6 +1388,7 @@ function openSessMenu(){
   openSheet(()=>({title:'Sesión',body:'<div class="pad"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Ir a un ejercicio</p><div class="group">'+p.ex.map((e,i)=>{const dn=(log[e.id]||[]).filter(x=>x&&x.r).length;
       return '<button class="cell" onclick="jumpTo('+i+')"><span class="exn'+(dn>=nSteps(e)?' done':'')+'">'+(dn>=nSteps(e)?ic('check',14,2.8):(i+1))+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(e.n)+'</p><p class="fn l2">'+dn+' de '+nSteps(e)+' series</p></div>'+(i===SS.ei?'<span class="pill tint">Ahora</span>':'')+'</div></button>'}).join('')+'</div>'+
     (()=>{const e=curEx();return e&&e.inc>0&&!e.bw?'<p class="ghead" role="heading" aria-level="2" style="padding-left:16px;margin-top:18px">'+esc(e.n)+'</p><div class="group"><div class="cell static"><div class="cb" style="padding-left:2px"><span class="tt bd">Salto de peso</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',-1)" aria-label="Bajar el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('minus',16,2.4)+'</button><span class="hl num" style="min-width:56px;text-align:center">'+String(e.inc).replace('.',',')+' kg</span><button class="mini" style="background:var(--fill2)" onclick="incEdit('+SS.day+','+SS.ei+',1)" aria-label="Subir el salto de peso, ahora '+String(e.inc).replace('.',',')+' kilos">'+ic('plus',16,2.4)+'</button></div></div></div><p class="gfoot" style="padding-left:16px">'+(isMaq(e)?'Lo que sube la placa de la máquina.':'Lo que va de un disco o una mancuerna a la siguiente.')+'</p>':''})()+
+    (()=>{const e=curEx();return wuOK(e)?'<div class="group" style="margin-top:'+(e.inc>0&&!e.bw?'10px':'18px')+'">'+wuCell(e)+'</div>':''})()+
     '<div class="group" style="margin-top:18px"><button class="cell" onclick="'+(SS.paused?'closeSheet();resumeSession()':'pauseSession()')+'"><span class="ic soft">'+ic(SS.paused?'play':'pause',16)+'</span><div class="cb"><div class="tt"><p class="bd">'+(SS.paused?'Seguir':'Pausar la sesión')+'</p><p class="fn l2">El reloj y el descanso se detienen</p></div></div></button>'+
     '<button class="cell" onclick="closeSheet();finishSession()"><span class="ic soft">'+ic('check',17,2.6)+'</span><div class="cb"><span class="tt bd">Terminar la sesión ahora</span></div></button>'+
     '<button class="cell" onclick="exitSession()"><span class="ic gray">'+ic('out',17)+'</span><div class="cb"><div class="tt"><p class="bd">Salir</p><p class="fn l2">Lo anotado se guarda; puedes continuar luego</p></div></div></button></div>'+
@@ -1249,7 +1397,7 @@ function openSessMenu(){
 }
 function jumpTo(i){
   if(SS.paused){SS.paused=false;SS.pauseAt=0;SS.runAt=Date.now();sessPersist();keepAwake(true)}
-  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;
+  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;SS.preRest=false;SS.wKey=null;
   for(let j=0;j<nSteps(e);j++){SS.si=j;if(!(s[j]&&s[j].r))break}
   SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false;SS.wOn=false;closeSheet();renderSession();renderAcc();
 }

@@ -79,11 +79,13 @@ function mergeData(loc,rem){
     if(!rs){out.sess[d]=ls;return}
     const ex=Object.assign({},rs.ex);
     Object.entries(ls.ex||{}).forEach(([id,sets])=>{if(!ex[id]||filled(sets)>=filled(ex[id]))ex[id]=sets});
-    out.sess[d]=Object.assign({},rs,{ex,day:ls.day||rs.day,dur:Math.max(ls.dur||0,rs.dur||0)||undefined});
+    const wu=Object.assign({},rs.wu||{},ls.wu||{});
+    out.sess[d]=Object.assign({},rs,{ex,day:ls.day||rs.day,dur:Math.max(ls.dur||0,rs.dur||0)||undefined},Object.keys(wu).length?{wu}:{});
   });
   Object.entries(loc.skips||{}).forEach(([d,v])=>{if(!out.skips[d])out.skips[d]=v});
   Object.entries(loc.cex||{}).forEach(([id,e])=>{if(!out.cex[id])out.cex[id]=e});
   out.inc=Object.assign({},out.inc||{},loc.inc||{});
+  out.wu=Object.assign({},out.wu||{},loc.wu||{});
   return mergeDefaults(out);
 }
 
