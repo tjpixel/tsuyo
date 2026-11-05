@@ -51,14 +51,14 @@ const EXC={
  elevp:{n:'Elevación de piernas colgado',g:'Core',s:3,lo:10,hi:14,r:75,inc:0,bw:1,prog:'Estira más las piernas o baja más lento.',k:['Hombros activos, deprimidos','Sube con el abdomen: la pelvis bascula arriba','Sin balanceo ni impulso','Baja lento y controlado']},
  deadbug:{n:'Dead bug',g:'Core',s:3,lo:8,hi:12,r:60,inc:0,bw:1,side:1,prog:'Hazlo más lento o con brazos y piernas más extendidos.',k:['Lumbar pegada al suelo todo el rato','Brazo y pierna contrarios a la vez','Exhala al extender','Si la lumbar se despega, acorta el recorrido']},
  // ── CARDIO
- cardio:{n:'Cardio continuo',g:'Cardio',s:1,lo:20,hi:20,r:0,inc:0,seg:1,min:1,spd:1,tip:'Progresa en velocidad, no en minutos',k:['Ritmo constante y sostenible','Postura erguida y core activo','No te apoyes en las barras','Si no puedes hablar, baja la intensidad']},
+ cardio:{n:'Cardio continuo',g:'Cardio',s:1,lo:20,hi:20,r:90,inc:0,seg:1,min:1,spd:1,tip:'Progresa en velocidad, no en minutos',k:['Ritmo constante y sostenible','Postura erguida y core activo','No te apoyes en las barras','Si no puedes hablar, baja la intensidad']},
  // ── ATLÉTICOS (fuerza útil para cualquier deporte)
  stepup:{n:'Subida al banco (step-up)',g:'Pierna',s:3,lo:8,hi:12,r:90,inc:2,side:1,k:['Banco a la altura de la rodilla o algo menos','Todo el pie apoyado arriba','Sube empujando con la pierna de arriba, no impulsándote con la de abajo','Rodilla en línea con el pie','Baja lento y controlado']},
  salto:{n:'Salto al cajón',g:'Pierna',s:3,lo:4,hi:6,r:90,inc:0,bw:1,prog:'Sube la altura del cajón poco a poco, sin perder un aterrizaje suave.',tip:'Calidad, no cansancio: para antes de que el salto pierda altura',k:['Cajón bajo para empezar','Brazos atrás y salta extendiendo cadera y rodillas','Aterriza suave, con las rodillas en línea con los pies','Baja del cajón andando, no saltando','Descansa lo necesario: cada salto debe ser explosivo']},
  swing:{n:'Swing con kettlebell',g:'Glúteo',s:3,lo:12,hi:15,r:90,inc:4,tip:'Es un movimiento de cadera, no una sentadilla',k:['Pies algo más anchos que la cadera','Bisagra de cadera: la kettlebell pasa entre las piernas','Golpe de cadera y glúteos para proyectarla','Los brazos solo guían, no levantan','Arriba, cuerpo recto y abdomen firme','Espalda neutra en todo momento']},
  pallof:{n:'Press Pallof',g:'Core',s:3,lo:10,hi:12,r:60,inc:2.5,side:1,tip:'Core que resiste el giro: el tronco no debe rotar',k:['Polea a la altura del pecho, de lado a ella','Pies a la anchura de caderas, rodillas algo flexionadas','Agarre con las dos manos pegado al pecho','Extiende los brazos al frente sin dejar que el tronco gire','Aguanta 2 segundos y vuelve']},
  colgado:{n:'Colgarse de la barra',g:'Espalda',s:3,lo:20,hi:40,r:75,inc:0,seg:1,bw:1,prog:'Cuélgate de una mano o añade peso con un cinturón.',tip:'Agarre, hombros y espalda: muy útil para casi cualquier deporte',k:['Agarre completo, pulgar alrededor de la barra','Hombros activos: no te quedes colgado de las articulaciones','Cuerpo quieto, sin balanceo','Si molesta el hombro, apoya los pies y descarga peso']},
- cardiof:{n:'Cardio final',g:'Cardio',s:1,lo:10,hi:10,r:0,inc:0,seg:1,min:1,spd:1,tip:'Suave, para cerrar la sesión',k:['Ritmo cómodo','Puedes hablar con frases completas','Postura erguida']}
+ cardiof:{n:'Cardio final',g:'Cardio',s:1,lo:10,hi:10,r:90,inc:0,seg:1,min:1,spd:1,tip:'Suave, para cerrar la sesión',k:['Ritmo cómodo','Puedes hablar con frases completas','Postura erguida']}
 };
 // imágenes disponibles en img/ (las que no existan se ocultan solas)
 const IMG={plancha:'img/plancha.webp',femoral:'img/femoral.webp',elevp:'img/elevp.webp',jalon:'img/jalon.webp',pressp:'img/pressp.webp',plancL:'img/plancL.webp',hipth:'img/hipth.webp',prensa:'img/prensa.webp',puente:'img/puente.webp',remo:'img/remo.webp',kickb:'img/kickb.webp',cardio:'img/cardio25.webp',cardiof:'img/cardio25.webp',laterales:'img/latmanc.webp',crunchpol:'img/crunchpol.webp'};
@@ -142,7 +142,7 @@ const TYPES={
  peso:{n:'Con carga (kg)',d:{s:3,lo:8,hi:12,r:120,inc:2.5}},
  corporal:{n:'Peso corporal (reps)',d:{s:3,lo:8,hi:15,r:90,inc:0,bw:1}},
  tiempo:{n:'Por tiempo (segundos)',d:{s:3,lo:20,hi:40,r:60,inc:0,seg:1,bw:1}},
- cardio:{n:'Cardio (minutos)',d:{s:1,lo:20,hi:20,r:0,inc:0,seg:1,min:1,spd:1}}
+ cardio:{n:'Cardio (minutos)',d:{s:1,lo:20,hi:20,r:90,inc:0,seg:1,min:1,spd:1}}
 };
 const EDITABLE=['s','lo','hi','r','side'];   // Tsuyo: «side» permite hacer por lados un ejercicio del catálogo
 
