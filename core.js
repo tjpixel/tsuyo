@@ -153,6 +153,7 @@ function exResolve(ref){
   EDITABLE.forEach(k=>{if(ref[k]!=null)o[k]=ref[k]});
   const mi=(DB.inc||{})[ref.id];if(mi&&o.inc>0&&!o.bw)o.inc=mi;   // salto real de la máquina/discos del usuario
   if(o.lo>o.hi)o.hi=o.lo;
+  if(ref.rup){o.rup=ref.rup;o.rhi=ref.rhi}           // objetivo de tiempo subido solo (ver autoRange)
   return o;
 }
 function exName(id){const b=exBase(id);return b?b.n:id}
@@ -165,6 +166,27 @@ let PLAN={};
 function buildPlan(){
   PLAN={};
   (DB.plan?.days||[]).forEach((d,i)=>{PLAN[i+1]={n:d.n||('Día '+(i+1)),ex:(d.ex||[]).map(exResolve).filter(Boolean)}});
+  if(autoRange())buildPlan();
+}
+/* Ejercicios por tiempo (plancha, colgarse…): si la última sesión normal llegó al tope del rango
+   en todas las series, el objetivo sube 5 s (20–35 → 25–40), hasta un tope de 60 s.
+   A partir de 60 s ya no se sube el tiempo: el consejo propone una variante más difícil.
+   «rup» guarda de qué sesión salió la subida, para no subir dos veces por la misma. */
+const RANGE_STEP=5,RANGE_CAP=60;
+function autoRange(){
+  if(!DB.plan||typeof lastFor!=='function'||typeof curDate==='undefined')return false;
+  const B=blockInfo();if(B&&B.bw===11)return false;
+  let ch=false;const seen={};
+  DB.plan.days.forEach((d,k)=>(d.ex||[]).forEach((ref,i)=>{
+    const r=exResolve(ref);if(!r||!r.seg||r.spd||r.min||r.hi>=RANGE_CAP)return;
+    const L=seen[r.id]!==undefined?seen[r.id]:(seen[r.id]=lastFor(r.id));if(!L||ref.rup===L.d)return;
+    const done=L.sets.filter(x=>x&&x.r);
+    if(!(done.length>=nSteps(r)&&done.every(x=>x.r>=r.hi)))return;
+    const hi=Math.min(RANGE_CAP,r.hi+RANGE_STEP),lo=Math.min(hi,r.lo+RANGE_STEP);
+    ref.lo=lo;ref.hi=hi;ref.rup=L.d;ref.rhi=hi;ch=true;
+  }));
+  if(ch)save();
+  return ch;
 }
 const dayKeys=()=>Object.keys(PLAN).map(Number);
 const validDay=n=>(n&&PLAN[n])?n:0;
@@ -260,7 +282,7 @@ function sanitizeDB(r){
   if(isObj(r.plan)&&Array.isArray(r.plan.days)){
     const days=r.plan.days.slice(0,6).filter(isObj).map((d,i)=>({n:sStr(d.n,40)||('Día '+(i+1)),
       ex:(Array.isArray(d.ex)?d.ex:[]).filter(x=>isObj(x)&&RX_ID.test(x.id)).slice(0,25).map(x=>{
-        const o={id:x.id};[['s',1,10],['lo',1,999],['hi',1,999],['r',0,600],['side',0,1]].forEach(([k,a,b])=>{const v=sNum(x[k],a,b);if(v!=null)o[k]=Math.round(v)});return o})}));
+        const o={id:x.id};[['s',1,10],['lo',1,999],['hi',1,999],['r',0,600],['side',0,1],['rhi',1,999]].forEach(([k,a,b])=>{const v=sNum(x[k],a,b);if(v!=null)o[k]=Math.round(v)});if(typeof x.rup==='string'&&RX_DATE.test(x.rup))o.rup=x.rup;return o})}));
     if(days.length)out.plan={src:sStr(r.plan.src,20).replace(/[^a-z0-9_]/gi,'')||'custom',edited:!!r.plan.edited,
       prio:(Array.isArray(r.plan.prio)?r.plan.prio:[]).map(Number).filter(n=>n>=1&&n<=days.length),days};
   }
@@ -372,11 +394,20 @@ function lastFor(id){
   return null;
 }
 /* repeticiones de la última vez; en ejercicios por lados se agrupan izquierda/derecha para no parecer el doble de series */
-function repsTxt(e,sets){
-  const d=(sets||[]).filter(x=>x&&x.r);if(!e.side)return d.map(x=>x.r).join(', ');
+function repsTxt(e,sets,un){
+  un=un?' '+un:'';
+  const d=(sets||[]).filter(x=>x&&x.r);if(!e.side)return d.map(x=>x.r).join(', ')+un;
   const pr=[];for(let i=0;i<sets.length;i+=2){const a=sets[i]&&sets[i].r,b=sets[i+1]&&sets[i+1].r;if(a||b)pr.push([a||0,b||0])}
-  if(pr.length&&pr.every(p=>p[0]===pr[0][0]&&p[1]===pr[0][0]))return pr[0][0]+' por lado'+(pr.length>1?' en las '+pr.length+' series':'');
-  return pr.map(p=>p[0]+'/'+p[1]).join(', ')+' (izq./dcha.)';
+  if(pr.length&&pr.every(p=>p[0]===pr[0][0]&&p[1]===pr[0][0]))return pr[0][0]+un+' por lado'+(pr.length>1?' en las '+pr.length+' series':'');
+  return pr.map(p=>p[0]+'/'+p[1]).join(', ')+un+' (izq./dcha.)';
+}
+/* series de la última vez que se quedaron por debajo del tope: «1 s en la serie 2 (dcha.)» */
+function shortTxt(e,sets,un){
+  const n=nSteps(e),out=[];
+  for(let i=0;i<n;i++){const x=sets[i];if(!x||!x.r)return null;if(x.r<e.hi)out.push({i,f:e.hi-x.r})}
+  if(!out.length||out.length>2)return null;
+  const one=o=>o.f+' '+un+' en la serie '+setNo(e,o.i)+(e.side?(o.i%2?' (dcha.)':' (izq.)'):'');
+  return(out.length===1&&out[0].f===1?'Te faltó ':'Te faltaron ')+out.map(one).join(' y ')+'.';
 }
 /* ejercicios que se hacen en máquina o polea: solo en estos se habla de «tu máquina».
    El resto (barra, mancuernas, kettlebell, disco sobre la cadera…) habla de saltos de peso. */
@@ -433,8 +464,18 @@ function advise(e){
     return{txt:'Última vez '+Math.max(...sp)+' km/h durante '+done[0].r+' min. <b>Sube la velocidad, no los minutos.</b>',up:false,w:''};
   }
   if(e.bw){
-    if(allTop)return{txt:'Techo alcanzado. '+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
-    return{txt:'Última vez: '+repsTxt(e,L.sets)+(e.seg?' '+(e.min?'min':'s')+'. Aguanta un poco más cada vez hasta '+e.hi+' '+(e.min?'min':'s')+(e.side?' por lado':'')+' en todas las series.':'. Peso corporal — suma repeticiones.'),up:false,w:''};
+    const un=e.min?'min':'s',pl=e.side?' por lado':'';
+    if(e.seg&&e.rup===L.d&&e.rhi===e.hi)
+      return{txt:'Llegaste al tope en todas las series. <b>El objetivo sube a '+e.lo+'–'+e.hi+' '+un+'</b>'+pl+'.',up:true,w:''};
+    if(allTop){
+      const ex=e.seg&&e.hi>=RANGE_CAP?'Ya aguantas '+e.hi+' '+un+pl+': más tiempo ya no suma tanto. ':'';
+      return{txt:'Techo alcanzado. '+ex+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
+    }
+    if(e.seg){
+      const sh=shortTxt(e,L.sets,un);
+      return{txt:'Última vez: '+repsTxt(e,L.sets,un)+'. '+(sh?sh+' Hoy, <b>'+e.hi+' '+un+pl+'</b> en todas.':'Aguanta un poco más cada vez hasta '+e.hi+' '+un+pl+' en todas las series.'),up:false,w:''};
+    }
+    return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Peso corporal — suma repeticiones.',up:false,w:''};
   }
   if(e.opt&&!mx){
     if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};

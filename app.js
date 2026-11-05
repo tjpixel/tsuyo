@@ -130,7 +130,7 @@ function go(v){
   window.scrollTo(0,0);render();
 }
 function render(){
-  curDate=T();applyLook();
+  {const nd=T();if(nd!==curDate){curDate=nd;buildPlan()}}applyLook();
   if(cur==='hoy')renderHoy();if(cur==='progreso')renderProg();if(cur==='rutina')renderRut();
   renderAcc();
   $('btnMe').innerHTML='<span class="deshi" data-pose="stand" data-crop="head" data-box="40" data-still></span>';
