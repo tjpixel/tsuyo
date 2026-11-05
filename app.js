@@ -149,6 +149,12 @@ function estMin(n){
   let s=360;PLAN[n].ex.forEach((e,i)=>{const work=e.seg?(e.min?e.hi*60:e.hi):45;s+=nSteps(e)*work+Math.max(0,e.s-1)*e.r;if(i<PLAN[n].ex.length-1)s+=90});
   return Math.round(s/60/5)*5||5;
 }
+/* texto bajo el reloj de la plancha: rango normal o, en semana ligera, el tiempo de hoy */
+function segLab(e,el){
+  const lg=lightGoal(e);
+  if(lg)return el>=lg?'suficiente por hoy':'semana ligera · unos '+lg+' s';
+  return el>=e.hi?'tope del rango':(el>=e.lo?'en rango':'objetivo '+e.lo+'–'+e.hi+' s');
+}
 const unitOf=e=>e.seg?(e.min?'min':'s'):'reps';
 function exLine(e){
   const a=advise(e),u=unitOf(e);
@@ -902,7 +908,7 @@ function renderSession(){
       '<div class="card row" style="margin-top:20px;padding:14px 16px;gap:13px;align-items:flex-start">'+(a.up?'<span class="ic tint" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('up',18,2.6)+'</span>':'<span class="ic soft" style="width:34px;height:34px;border-radius:50%;display:grid;place-items:center">'+ic('chart',17)+'</span>')+
       '<p class="sb grow">'+a.txt+'</p></div>';
     if(e.spd){
-      if(SS.mins==null)SS.mins=e.hi;if(SS.sp==null){const L=lastFor(e.id);SS.sp=L?Math.max(0,...L.sets.map(x=>x&&x.sp||0))||null:null}
+      if(SS.mins==null)SS.mins=e.hi;if(SS.sp==null){if(a.sp)SS.sp=a.sp;else{const L=lastFor(e.id);SS.sp=L?Math.max(0,...L.sets.map(x=>x&&x.sp||0))||null:null}}
       const el=cEl(),R=80,C=2*Math.PI*R,tg=SS.mins*60,st=SS.wOn?'run':(el>0?'pause':'idle');
       h+='<div style="display:flex;flex-direction:column;align-items:center;margin-top:22px"><div class="ring" style="width:184px;height:184px"><svg width="184" height="184" viewBox="0 0 184 184" aria-hidden="true"><circle cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
         '<circle id="cArc" cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C*(1-Math.min(1,el/tg))+'"/></svg>'+
@@ -914,8 +920,8 @@ function renderSession(){
     }else if(e.seg){
       const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0,R=88,C=2*Math.PI*R;
       h+='<div style="display:flex;flex-direction:column;align-items:center;margin-top:26px"><div class="ring" style="width:200px;height:200px"><svg width="200" height="200" viewBox="0 0 200 200" aria-hidden="true"><circle cx="100" cy="100" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="12"/>'+
-        '<circle id="swArc" cx="100" cy="100" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C*(1-Math.min(1,el/e.hi))+'"/></svg>'+
-        '<div class="in"><span class="rnd num bold" style="font-size:54px;line-height:60px" id="swT">'+mmss(el)+'</span><span class="fn l2" id="swL">objetivo '+e.lo+'–'+e.hi+' s</span></div></div>'+
+        '<circle id="swArc" cx="100" cy="100" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C*(1-Math.min(1,el/(lightGoal(e)||e.hi)))+'"/></svg>'+
+        '<div class="in"><span class="rnd num bold" style="font-size:54px;line-height:60px" id="swT">'+mmss(el)+'</span><span class="fn l2" id="swL">'+segLab(e,el)+'</span></div></div>'+
         (e.id==='plancha'||e.id==='plancL'?'<p class="fn amb center" style="margin-top:12px">Para cuando la cadera empiece a caer.</p>':'')+'</div>'+
         '<div class="foot"><button class="btn pri lg" onclick="swToggle()">'+(SS.wOn?ic('stop',22)+'Parar y anotar':ic('play',20)+'Empezar')+'</button><button class="btn tx" onclick="skipSet()">Saltar serie</button></div>';
     }else{
@@ -956,7 +962,7 @@ function a11ySess(){
     const e=curEx(),setN=e.side?Math.floor(SS.si/2)+1:SS.si+1,lo=e.lo,hi=e.hi,rng=lo===hi?String(hi):lo+' a '+hi;
     s='. Serie '+setN+' de '+e.s+(e.side?(SS.si%2?', lado derecho':', lado izquierdo'):'');
     if(e.spd)s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';
-    else if(e.seg)s+=SS.wOn?'. Cronómetro en marcha':'. Por tiempo, objetivo '+rng+' segundos. Pulsa Empezar';
+    else if(e.seg)s+=SS.wOn?'. Cronómetro en marcha':(lightGoal(e)?'. Semana ligera, aguanta unos '+lightGoal(e)+' segundos. Pulsa Empezar':'. Por tiempo, objetivo '+rng+' segundos. Pulsa Empezar');
     else if(e.bw)s+='. Peso corporal, objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
     else s+='. '+(SS.w?spkKg(SS.w):'Sin peso puesto')+', objetivo '+rng+' repeticiones'+(e.side?' por lado':'');
     if(SS.bg&&SS.tEnd)s+='. El descanso sigue: quedan '+spkT((SS.tEnd-Date.now())/1000);
@@ -980,7 +986,7 @@ function a11yTimers(){
   if(SS.ph==='rest'&&SS.tEnd)lab('rT','Descanso: quedan '+spkT(Math.ceil((SS.tEnd-(SS.paused?SS.pauseAt:Date.now()))/1000)));
   const e=SS.on&&SS.ph==='set'?curEx():null;if(!e)return;
   if(e.spd){const el=cEl();lab('cT','Cardio: llevas '+spkT(el)+' de '+spkT((SS.mins||e.hi)*60))}
-  else if(e.seg){const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0;lab('swT','Llevas '+spkT(el)+', objetivo '+e.lo+' a '+e.hi+' segundos')}
+  else if(e.seg){const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0;{const lg=lightGoal(e);lab('swT','Llevas '+spkT(el)+(lg?', semana ligera, unos '+lg+' segundos':', objetivo '+e.lo+' a '+e.hi+' segundos'))}}
   const p=$('bgPill');if(p&&SS.tEnd)p.setAttribute('aria-label','Descanso: quedan '+spkT(Math.ceil((SS.tEnd-Date.now())/1000)));
 }
 /* avisos mientras corre el tiempo: a los 10 s del descanso, al acabarlo y al entrar en rango en las series por tiempo */
@@ -988,7 +994,9 @@ function a11yTick(){
   if(SS.paused)return;
   const sec=Math.floor(Date.now()/1000);if(sec===SS.a11yS)return;SS.a11yS=sec;a11yTimers();
   const e=SS.on&&SS.ph==='set'?curEx():null;
-  if(e&&e.seg&&SS.wOn){const el=Math.floor((Date.now()-SS.wStart)/1000),st=el>=e.hi?2:(el>=e.lo?1:0);
+  if(e&&e.seg&&!e.spd&&SS.wOn&&lightGoal(e)){const el=Math.floor((Date.now()-SS.wStart)/1000),st=el>=lightGoal(e)?3:0;
+    if(st!==SS.a11ySeg){if(st===3)say('Suficiente por hoy, '+el+' segundos');SS.a11ySeg=st}}
+  else if(e&&e.seg&&SS.wOn){const el=Math.floor((Date.now()-SS.wStart)/1000),st=el>=e.hi?2:(el>=e.lo?1:0);
     if(st!==SS.a11ySeg){if(st===1)say('En rango, '+el+' segundos');if(st===2)say('Tope del rango, '+el+' segundos');SS.a11ySeg=st}}
   else SS.a11ySeg=0;
 }
@@ -1160,8 +1168,8 @@ function tick(){
   }
   if(SS.ph==='set'&&SS.wOn){
     const e=curEx(),el=Math.floor((Date.now()-SS.wStart)/1000),t=$('swT'),a=$('swArc');
-    if(t)t.textContent=mmss(el);if(a){const C=2*Math.PI*88;a.setAttribute('stroke-dashoffset',C*(1-Math.min(1,el/e.hi)))}
-    const l=$('swL');if(l)l.textContent=el>=e.hi?'tope del rango':(el>=e.lo?'en rango':'objetivo '+e.lo+'–'+e.hi+' s');
+    if(t)t.textContent=mmss(el);if(a){const C=2*Math.PI*88;a.setAttribute('stroke-dashoffset',C*(1-Math.min(1,el/(lightGoal(e)||e.hi))))}
+    const l=$('swL');if(l)l.textContent=segLab(e,el);
     renderAcc();return;
   }
   if(SS.ph!=='rest'||!SS.tEnd)return;

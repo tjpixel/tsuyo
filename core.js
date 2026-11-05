@@ -382,6 +382,23 @@ function repsTxt(e,sets){
 const r2=x=>Math.round(x*100)/100;
 function snapW(w,inc){if(!(inc>0)||!(w>0))return w;return r2(Math.max(inc,Math.round(w/inc)*inc))}
 const offStep=(w,inc)=>inc>0&&w>0&&Math.abs(w/inc-Math.round(w/inc))>1e-6;
+/* semana ligera: velocidad de cardio al ~85 % de la última (en saltos de 0,5 km/h)
+   y tiempo de plancha a ~2/3 del mejor tiempo (en saltos de 5 s, o 1 min) */
+const fmtSp=v=>String(v).replace('.',',');
+function lightSpeed(e,L){
+  if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r&&x.sp||0));if(!mx)return null;
+  return{mx,sp:Math.max(0.5,Math.round(mx*0.85*2)/2)};
+}
+function lightTime(e,L){
+  if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r||0));if(!mx)return null;
+  const st=e.min?1:5,t=Math.max(st*(e.min?1:2),Math.round(mx*2/3/st)*st);
+  return{mx,t:Math.min(t,mx)};
+}
+/* objetivo de tiempo de hoy en semana ligera (null si es semana normal o no hay historial) */
+function lightGoal(e){
+  if(!e||!e.seg||e.spd)return null;const B=blockInfo();if(!B||B.bw!==11)return null;
+  const lt=lightTime(e,lastFor(e.id));return lt?lt.t:null;
+}
 function advise(e){
   const L=lastFor(e.id);
   const u=e.seg?(e.min?'min':'seg'):'reps';
@@ -391,8 +408,17 @@ function advise(e){
   const allTop=done.length>=nSteps(e)&&done.every(x=>x.r>=e.hi);
   const Bd=blockInfo();
   if(Bd&&Bd.bw===11){
-    if(e.spd)return{txt:'<b>Semana ligera.</b> Mismo tiempo a ritmo cómodo, RPE 4.',up:false,w:''};
-    if(e.seg)return{txt:'<b>Semana ligera.</b> Unos 2/3 del tiempo habitual, lejos del límite.',up:false,w:''};
+    if(e.spd){
+      const ls=lightSpeed(e,L);
+      if(!ls)return{txt:'<b>Semana ligera.</b> Mismo tiempo a ritmo cómodo, RPE 4.',up:false,w:''};
+      return{txt:'<b>Semana ligera.</b> Ponte en <b>'+fmtSp(ls.sp)+' km/h</b> (≈85&nbsp;% de '+fmtSp(ls.mx)+'), mismos minutos, RPE 4.',up:false,w:'',sp:ls.sp};
+    }
+    if(e.seg){
+      const lt=lightTime(e,L);
+      if(!lt)return{txt:'<b>Semana ligera.</b> Unos 2/3 del tiempo habitual, lejos del límite.',up:false,w:''};
+      const un=e.min?' min':' s';
+      return{txt:'<b>Semana ligera.</b> Aguanta unos <b>'+lt.t+un+'</b> (2/3 de tus '+lt.mx+un+'), lejos del límite.',up:false,w:'',lt:lt.t};
+    }
     if(e.bw||!e.inc||!mx)return{txt:'<b>Semana ligera.</b> Unas 2/3 de tus repeticiones habituales, RIR 4.',up:false,w:''};
     const lw=Math.max(e.inc,Math.round(mx*0.65/e.inc)*e.inc);
     return{txt:'<b>Semana ligera.</b> Usa <b>'+lw+' kg</b> (≈'+Math.round(lw/mx*100)+'% de '+mx+'), mismas series, RIR 4.',up:false,w:lw};
