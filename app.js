@@ -58,9 +58,9 @@ const spkKg=w=>String(w).replace('.',',')+(w==1?' kilo':' kilos');
 function a11yFocus(el){if(!el)return;if(el.tabIndex<0&&!el.hasAttribute('tabindex'))el.setAttribute('tabindex','-1');try{el.focus({preventScroll:true})}catch(e){}}
 /* solo la capa de arriba se puede recorrer: hoja > pantalla completa > app; lo de debajo queda inerte */
 function a11ySync(){
-  const sh=$('sheet'),full=['session','onb','welcome'].map($).find(x=>x&&x.classList.contains('on'));
+  const sh=$('sheet'),full=['cele','session','onb','welcome'].map($).find(x=>x&&x.classList.contains('on'));
   const top=sh.classList.contains('on')?sh:(full||$('app'));
-  ['app','session','onb','welcome','sheet'].forEach(id=>{const x=$(id);if(x)x.inert=x!==top});
+  ['app','cele','session','onb','welcome','sheet'].forEach(id=>{const x=$(id);if(x)x.inert=x!==top});
   /* al cerrarse una pantalla completa (bienvenida, primeros pasos, sesión), el lector va al título de lo que queda */
   if(top!==a11ySync.top&&top.id!=='sheet'&&a11ySync.top&&a11ySync.top.id!=='sheet')setTimeout(()=>{const a=document.activeElement;if(a&&a!==document.body&&top.contains(a))return;a11yFocus(top.querySelector('.view.on h1')||top.querySelector('h1'))},0);
   a11ySync.top=top;
@@ -132,7 +132,7 @@ function go(v){
 function render(){
   {const nd=T();if(nd!==curDate){curDate=nd;buildPlan()}}applyLook();
   if(cur==='hoy')renderHoy();if(cur==='progreso')renderProg();if(cur==='rutina')renderRut();
-  renderAcc();
+  renderAcc();checkBlock();
   $('btnMe').innerHTML='<span class="deshi" data-pose="stand" data-crop="head" data-box="40" data-still></span>';
 }
 
@@ -225,7 +225,7 @@ function renderHoy(){
       '<div class="pad"><div class="card" style="padding:14px 8px 12px">'+weekStrip(P)+'</div>';
     if(P.noFit.length&&!(DB.cfg.start&&DB.cfg.start>=P.week[0]))h+='<p class="fn l2" style="padding:8px 16px 0">'+(P.noFit.length>1?P.noFit.length+' sesiones no caben':'«'+esc(PLAN[P.noFit[0]].n)+'» no cabe')+' en lo que queda de semana. El lunes se reparten de nuevo.</p>';
     if(B&&B.bw===10)h+='<p class="fn l2" style="padding:8px 16px 0">La semana que viene es la semana ligera. Aprovecha esta para exprimir tus pesos.</p>';
-    if(B&&B.bw===12)h+='<p class="fn l2" style="padding:8px 16px 0">Semana de revisión: mira tus récords en Progreso.</p>';
+    if(B&&B.bw===12)h+='<p class="fn l2" style="padding:8px 16px 0">Última semana del bloque. Al acabarla verás el resumen de tus 12 semanas.</p>';
     h+='</div></div>';
   }
   // ejercicios de la sesión
@@ -350,6 +350,9 @@ function renderProg(){
   h+='<div class="sec"><div class="stitle"><h3 class="t3">Récords recientes</h3>'+(Object.keys(R).length?'<button class="fn link" onclick="openRecords()">Ver todos</button>':'')+'</div><div class="pad"><div class="group">'+
     (recent.length?recent.map(id=>'<div class="cell static"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(exName(id))+'</p><p class="fn l2 num">'+esc(R[id].lbl)+'</p></div><span class="fn l2">'+(R[id].d===T()?'Hoy':fmtD(R[id].d))+'</span></div></div>').join('')
       :'<div class="empty">Tus mejores marcas aparecerán aquí cuando registres series.</div>')+'</div></div></div>';
+  const BL=blkDone();
+  if(BL.length)h+='<div class="sec"><div class="stitle"><h3 class="t3">Tus bloques</h3></div><div class="pad"><div class="group">'+BL.slice().reverse().map(b=>{const R=blkRange(b),n=blkSess(b).length;
+    return '<button class="cell" onclick="openCele('+b+',1)"><span class="ic tint">'+ic('trophy',17)+'</span><div class="cb"><div class="tt"><p class="bd">Bloque '+b+' · 12 semanas</p><p class="fn l2 num">'+fmtD(R.s)+' – '+fmtD(R.last)+' · '+n+' sesi'+(n===1?'ón':'ones')+'</p></div>'+chev()+'</div></button>'}).join('')+'</div></div></div>';
   h+='<div class="sec"><div class="stitle" style="justify-content:flex-start;gap:8px"><h3 class="t3">Más detalle</h3>'+(isPlus()?'':'<span class="pill plus">Plus</span>')+'</div><div class="pad"><div class="group">'+
     '<button class="cell" onclick="'+(isPlus()?'openExChart()':'openPlus()')+'"><span class="ic soft">'+ic('chart',18)+'</span><div class="cb"><span class="tt bd">Progreso por ejercicio</span>'+chev()+'</div></button>'+
     '<button class="cell" onclick="openHistory()"><span class="ic soft">'+ic('cal',18)+'</span><div class="cb"><div class="tt"><p class="bd">Historial de sesiones</p>'+(isPlus()?'':'<p class="fn l2">Últimos 30 días; completo con Plus</p>')+'</div>'+chev()+'</div></button>'+
@@ -413,6 +416,210 @@ function openExChart(id){
   openSheet(()=>({title:esc(e.n),body:'<div class="pad"><div class="card" style="padding:16px"><p class="fn l2">'+(e.spd?'Velocidad máxima':((e.bw||e.seg)?'Mejor serie':'Peso máximo'))+'</p>'+
     '<p class="t2 num">'+(lastP?lastP.v+' '+unit:'—')+'</p>'+(first&&lastP&&pts.length>1?'<p class="fn l2 num">'+(lastP.v-first.v>=0?'+':'')+(Math.round((lastP.v-first.v)*10)/10)+' '+unit+' desde el '+fmtD(first.d)+'</p>':'')+
     '<div class="chart">'+svg+'</div></div></div>'}),true);
+}
+
+/* ═════ FIN DE BLOQUE · CELEBRACIÓN DE LAS 12 SEMANAS ═════
+   Un bloque son 12 semanas (84 días) desde el día en que empezaste (DB.cfg.start). Al terminarlo, Tsuyo lo celebra
+   una sola vez con un resumen muy visual. DB.cfg.cel guarda el último bloque celebrado y viaja con la cuenta.
+   · Si la sesión de hoy es la última del bloque, la pantalla de «Sesión completada» ofrece verlo.
+   · Si no, sale sola la primera vez que abres la app en el bloque nuevo.
+   Solo sale sola si el bloque tuvo al menos BLK_MIN sesiones. Todos los resúmenes se vuelven a ver en Progreso. */
+const BLK_MIN=6,CAR_KG=1200;                               // un coche pequeño, para comparar el volumen
+const dDays=(a,b)=>Math.round((new Date(b+'T00:00:00')-new Date(a+'T00:00:00'))/864e5);
+const dLong=d=>{const x=new Date(d+'T00:00:00');return x.getDate()+' de '+MESES[x.getMonth()]};
+function blkRange(b){const s=shiftD(DB.cfg.start,(b-1)*84);return{s,e:shiftD(s,84),last:shiftD(s,83)}}
+function blkSess(b){if(!DB.cfg.start)return[];const R=blkRange(b);return Object.keys(DB.sess).filter(d=>d>=R.s&&d<R.e&&sessDone(d)).sort()}
+/* último bloque terminado por calendario (0 mientras vas por el primero) */
+function blkLast(){const w=weekNo();return w&&w>12?Math.floor((w-1)/12):0}
+/* ¿la sesión de hoy cierra el bloque? Semana 12, el bloque acaba esta semana y no queda ninguna sesión prevista antes */
+function blkEndsToday(){
+  const B=blockInfo();if(!B||B.bw!==12||!sessDone(T()))return 0;
+  const R=blkRange(B.b),P=planWeek();
+  if(R.e>shiftD(P.week[0],7))return 0;
+  return Object.keys(P.sched).some(d=>d>T()&&d<R.e)?0:B.b;
+}
+const blkNew=b=>b>(DB.cfg.cel||0)&&blkSess(b).length>=BLK_MIN;
+/* bloques terminados (o ya celebrados) con algún entreno, para Progreso */
+function blkDone(){const n=Math.max(blkLast(),DB.cfg.cel||0),o=[];for(let b=1;b<=n;b++)if(blkSess(b).length)o.push(b);return o}
+
+/* la mejor cifra de un ejercicio en una sesión: kg en los de carga; reps, segundos o km/h en el resto */
+function exBest(e,sets){
+  const ok=(sets||[]).filter(x=>x&&x.r);if(!ok.length)return null;
+  if(e.spd)return Math.max(...ok.map(x=>x.sp||0));
+  if(e.seg||e.bw)return Math.max(...ok.map(x=>x.r));
+  return Math.max(...ok.map(x=>x.w||0));
+}
+const exUnit=e=>e.spd?'km/h':(e.seg?(e.min?'min':'s'):(e.bw?'reps':'kg'));
+/* valor de récord, igual que prData (peso manda; a igual peso, más repeticiones) */
+function prVal(e,sets){
+  let v=null;(sets||[]).forEach(q=>{if(!q||!q.r)return;let x;
+    if(e.spd){if(!q.sp)return;x=q.sp}else if(e.seg||e.bw||!q.w)x=q.r;else x=q.w*1000+q.r;
+    if(v==null||x>v)v=x});
+  return v;
+}
+function blkSummary(b){
+  const R=blkRange(b),ds=blkSess(b),need=Math.max(1,Math.ceil(perWeek()*.75));
+  let sets=0,ton=0,min=0;const wk=Array(12).fill(0),hist={};
+  ds.forEach(d=>{
+    const s=DB.sess[d];wk[Math.min(11,Math.floor(dDays(R.s,d)/7))]++;if(s.dur)min+=s.dur;
+    Object.entries(s.ex||{}).forEach(([id,a])=>{
+      (a||[]).forEach(x=>{if(x&&x.r){sets++;ton+=(x.w||0)*x.r}});
+      const e=exBase(id);if(!e)return;const v=exBest(e,a);if(v!=null)(hist[id]=hist[id]||[]).push(v);
+    });
+  });
+  // lo que más ha subido: la primera vez del bloque frente a la mejor
+  const gains=Object.entries(hist).map(([id,v])=>{const e=exBase(id),f=v[0],m=Math.max(...v);return{id,n:e.n,u:exUnit(e),f,m,p:f>0?(m-f)/f:0}})
+    .filter(g=>g.f>0&&g.m>g.f).sort((a,b)=>b.p-a.p||a.n.localeCompare(b.n)).slice(0,4);
+  // récords batidos en el bloque (la primera vez que haces un ejercicio no cuenta)
+  const best={};let recs=0;
+  Object.keys(DB.sess).sort().forEach(d=>{if(d>=R.e)return;Object.entries(DB.sess[d].ex||{}).forEach(([id,a])=>{
+    const e=exBase(id);if(!e)return;const v=prVal(e,a);if(v==null)return;
+    if(best[id]!=null&&v>best[id]&&d>=R.s)recs++;if(best[id]==null||v>best[id])best[id]=v})});
+  // cinturón al empezar y al acabar
+  const by=weekCounts(),good=lim=>Object.keys(by).filter(w=>w<lim&&by[w]>=need).length;
+  const beltOf=n=>{let i=0;BELT_STEPS.forEach((x,k)=>{if(n>=x[2])i=k});return BELT_STEPS[i]};
+  return{b,R,n:ds.length,plan:perWeek()*12,sets,ton,min,wk,need,good:wk.filter(x=>x>=need).length,gains,recs,
+    b0:beltOf(good(mondayOf(R.s))),b1:beltOf(good(R.e))};
+}
+
+/* ── pantalla ── */
+let CE=null;
+const RMQ=matchMedia('(prefers-reduced-motion: reduce)');
+const fmtDec=(v,d)=>Number(v).toLocaleString('es-ES',{minimumFractionDigits:d||0,maximumFractionDigits:d||0});
+/* número que cuenta desde 0 al aparecer; el lector de pantalla oye siempre la cifra final */
+const cnt=(v,d)=>'<span class="ce-n" aria-hidden="true" data-to="'+v+'" data-dec="'+(d||0)+'">'+(RMQ.matches?fmtDec(v,d):'0')+'</span><span class="sr">'+fmtDec(v,d)+'</span>';
+const kgTxt=(v,u)=>fmtSp(r2(v))+' '+u;
+const IC_CAR='<path d="M3.5 15.5v-2.8l2.2-4.6c.3-.6.9-1.1 1.6-1.1h9.4c.7 0 1.3.5 1.6 1.1l2.2 4.6v2.8a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z"/><path d="M5.8 12h12.4"/><circle cx="7.8" cy="16.5" r="1.7"/><circle cx="16.2" cy="16.5" r="1.7"/>';
+
+function openCele(b,rev,mark){
+  if(!DB.cfg.start||!b)return;
+  if(!rev){const m=Math.max(b,mark||0);if(m>(DB.cfg.cel||0)){DB.cfg.cel=m;save()}}
+  const S=blkSummary(b),B=blockInfo(),inNew=!!(B&&B.b>b),nb=b+1;
+  CE={b,rev:!!rev,parts:[],raf:0,t:0,io:null};
+  const pct=S.plan?S.n/S.plan:0,C=2*Math.PI*50,hrs=S.min/60,ton=S.ton/1000,cars=Math.round(S.ton/CAR_KG);
+  const hrD=hrs<10?1:0,tonD=ton<100?1:0,maxW=Math.max(perWeek(),...S.wk,1);
+  let h='<canvas class="ce-fx" id="ceFx" aria-hidden="true"></canvas><div class="fullin ce">'+
+    '<div class="fnav"><span></span><button class="ibtn x-btn" onclick="closeCele()" aria-label="Cerrar">'+ic('x',16,2.4)+'</button></div>';
+  // portada: Deshi celebrando y la cuenta de 12 semanas
+  h+='<div class="ce-hero"><div class="ce-glow" aria-hidden="true"></div>'+
+    '<button class="ce-dk" onclick="ceBurst()" aria-label="Lanzar confeti">'+dkStage('cheer',3.1)+'</button>'+
+    '<span class="pill tint ce-pill">Bloque '+b+'</span>'+
+    '<h1 class="ce-h" id="ceT" tabindex="-1"><span class="ce-big num" id="ceBig" aria-hidden="true">'+(RMQ.matches?12:0)+'</span><span class="sr">12 </span><span class="t2">semanas completadas</span></h1>'+
+    '<div class="ce-dots" aria-hidden="true">'+Array.from({length:12},(_,i)=>'<i class="'+(i===10?'dl':'')+'"></i>').join('')+'</div>'+
+    '<p class="sb l2" style="margin-top:12px">Del '+dLong(S.R.s)+' al '+dLong(S.R.last)+'</p></div>';
+  h+='<div class="stack ce-list">';
+  // sesiones: anillo de lo hecho frente a lo previsto
+  h+='<div class="card ce-in ce-ses"><div class="ce-ring" aria-hidden="true"><svg width="116" height="116" viewBox="0 0 116 116"><circle cx="58" cy="58" r="50" fill="none" stroke="var(--fill2)" stroke-width="12"/>'+
+    '<circle class="v" cx="58" cy="58" r="50" fill="none" stroke="var(--tint)" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C+'" data-off="'+(C*(1-Math.min(1,pct)))+'" transform="rotate(-90 58 58)"/></svg>'+
+    '<div class="in num"><span>'+cnt(Math.round(pct*100))+'<small>%</small></span></div></div>'+
+    '<div class="grow"><p class="fn l2">Sesiones</p><p class="ce-num num">'+cnt(S.n)+'</p><p class="sb l2">de '+S.plan+' previstas</p></div></div>';
+  // horas, series y peso movido
+  const tiles=[];
+  if(S.min)tiles.push(['Horas',cnt(r2(hrs).toFixed(hrD),hrD),' h']);
+  tiles.push(['Series',cnt(S.sets),'']);
+  if(S.ton>=1000)tiles.push(['Peso movido',cnt(ton.toFixed(tonD),tonD),' t']);else if(S.ton)tiles.push(['Peso movido',cnt(Math.round(S.ton)),' kg']);
+  h+='<div class="card ce-in" style="overflow:hidden"><div class="row" style="gap:0">'+tiles.map(([l,v,u],i)=>
+    '<div class="grow center" style="padding:15px 6px 13px'+(i?';border-left:.5px solid var(--sep)':'')+'"><p class="fn l2">'+l+'</p><p class="t2 num">'+v+'<span class="sb l3 semi">'+u+'</span></p></div>').join('')+'</div>'+
+    (cars>=2?'<div class="ce-car"><span class="ic soft" aria-hidden="true"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'+IC_CAR+'</svg></span><p class="sb"><b>Como levantar '+fmtNum(cars)+' coches</b> <span class="l2">en total</span></p></div>':'')+'</div>';
+  // las 12 semanas, barra a barra
+  const wkSay=S.wk.map((c,i)=>'semana '+(i+1)+', '+c).join('; ');
+  h+='<div class="card ce-in" style="padding:16px 16px 14px"><div class="row" style="justify-content:space-between;gap:8px"><p class="hl">Tus 12 semanas</p><span class="pill tint num">'+S.good+' de 12 constantes</span></div>'+
+    '<div class="ce-wk" role="img" aria-label="Sesiones por semana: '+wkSay+'">'+S.wk.map((c,i)=>{
+      const on=c>=S.need,ht=c?Math.max(12,Math.round(c/maxW*82)):4;
+      return '<div class="b"><span class="col"><b class="num'+(c?'':' l3')+'" style="bottom:calc('+ht+'% + 3px);transition-delay:'+(i*70+350)+'ms">'+c+'</b><i class="bar'+(on?' on':'')+'" style="height:'+ht+'%;transition-delay:'+(i*70)+'ms"></i></span><small class="num'+(i===10?' amb':'')+'">'+(i+1)+'</small></div>'}).join('')+'</div>'+
+    '<p class="c1 l2" style="margin-top:10px">Verde: semana constante ('+S.need+' sesi'+(S.need===1?'ón':'ones')+' o más). La 11 fue la semana ligera.</p></div>';
+  // lo que ha subido
+  h+='<div class="card ce-in" style="padding:16px 16px 6px"><p class="hl">'+(S.gains.length?'Lo que has subido':'Tus marcas')+'</p>'+
+    (S.gains.length?S.gains.map((g,i)=>{const base=Math.round(g.f/g.m*100),pc=Math.round(g.p*100);
+      return '<div class="ce-g" role="img" aria-label="'+esc(g.n)+': de '+fmtSp(r2(g.f))+' a '+fmtSp(r2(g.m))+' '+g.u+', '+pc+' por ciento más">'+
+        '<div class="row" style="gap:8px"><p class="bd ell grow">'+esc(g.n)+'</p><span class="pill tint num">+'+pc+' %</span></div>'+
+        '<div class="trk"><i class="base" style="width:'+base+'%"></i><i class="gr" style="left:'+base+'%;width:'+(100-base)+'%;transition-delay:'+(250+i*160)+'ms"></i></div>'+
+        '<p class="fn l2 num">'+kgTxt(g.f,g.u)+' → <b class="ink">'+kgTxt(g.m,g.u)+'</b></p></div>'}).join('')
+      :'<p class="sb l2" style="padding:6px 0 12px">Has mantenido tus cifras. Mantener peso y repeticiones bloque tras bloque también es progresar.</p>')+'</div>';
+  // récords y cinturón
+  const bc=k=>'<i class="ce-belt" style="background:'+Deshi.BELTS[k[0]]+'"></i>',up=S.b1[0]!==S.b0[0];
+  h+='<div class="row ce-in" style="gap:12px;align-items:stretch">'+
+    '<div class="card grow ce-tile"><span class="ic tint" aria-hidden="true">'+ic('trophy',20)+'</span><p class="ce-num num">'+cnt(S.recs)+'</p><p class="fn l2">récord'+(S.recs===1?' batido':'s batidos')+'</p></div>'+
+    '<div class="card grow ce-tile"><div class="ce-belts" aria-hidden="true">'+(up?bc(S.b0)+ic('chevR',14,2.6)+bc(S.b1):bc(S.b1))+'</div>'+
+    '<p class="hl" style="margin-top:12px">Cinturón '+S.b1[1].toLowerCase()+'</p><p class="fn l2">'+(up?'Subiste desde el '+S.b0[1].toLowerCase():'Tu constancia sigue sumando')+'</p></div></div>';
+  // despedida: el saludo de Deshi y lo que viene
+  const nxt=inNew?'Ya estás en el bloque '+nb+'. Empieza con la reentrada: recupera tus pesos a RIR 3.':'El '+DIAS[wdOf(S.R.e)]+' '+dLong(S.R.e)+' empieza el bloque '+nb+', con una semana de reentrada para recuperar tus pesos.';
+  h+='<div class="card ce-in center" style="padding:22px 20px 20px"><div style="display:flex;justify-content:center">'+dkStage('rei',2.2)+'</div>'+
+    (CE.rev&&B&&B.b>nb?'<p class="t2" style="margin-top:14px">Bloque '+b+' hecho</p><p class="sb l2 balance" style="margin-top:6px">Cada bloque suma. Gracias por entrenar.</p>'
+      :'<p class="t2" style="margin-top:14px">Siguiente: bloque '+nb+'</p><p class="sb l2 balance" style="margin-top:6px">'+nxt+' Si quieres, cambia 1 o 2 ejercicios en Rutina para darle aire.</p>')+'</div>';
+  h+='</div><div class="foot">'+(CE.rev?'<button class="btn pri lg" onclick="closeCele()">Cerrar</button>'
+    :'<button class="btn pri lg" onclick="closeCele()">A por el bloque '+nb+'</button><button class="btn tx" onclick="closeCele();go(\'rutina\')">Revisar mi rutina</button>')+'</div></div>';
+  const el=$('cele');el.innerHTML=h;el.scrollTop=0;el.classList.add('on');
+  say('Bloque '+b+' completado. 12 semanas, '+S.n+' sesiones'+(S.recs?' y '+S.recs+(S.recs===1?' récord':' récords'):'')+'.');
+  setTimeout(()=>a11yFocus($('ceT')),60);
+  ceRun();
+}
+function closeCele(){
+  if(!CE)return;clearInterval(CE.t);cancelAnimationFrame(CE.raf);if(CE.io)CE.io.disconnect();CE=null;
+  const el=$('cele');el.classList.remove('on');el.innerHTML='';render();
+}
+/* la cuenta 1…12, el confeti y cada tarjeta animándose al entrar en pantalla */
+function ceRun(){
+  const root=$('cele'),big=$('ceBig'),dots=[...root.querySelectorAll('.ce-dots i')],cards=[...root.querySelectorAll('.ce-in')];
+  if(RMQ.matches||!window.IntersectionObserver){dots.forEach(d=>d.classList.add('on'));cards.forEach(c=>{c.classList.add('vis');ceAnim(c)});return}
+  let i=0;
+  setTimeout(()=>{if(!CE)return;CE.t=setInterval(()=>{
+    i++;big.textContent=i;if(dots[i-1])dots[i-1].classList.add('on');
+    if(i>=12){clearInterval(CE.t);big.classList.add('ce-pop');fanfare();ceBurst(true)}
+  },105)},420);
+  CE.io=new IntersectionObserver(es=>es.forEach(en=>{if(!en.isIntersecting)return;en.target.classList.add('vis');ceAnim(en.target);CE.io.unobserve(en.target)}),{root,threshold:.2});
+  cards.forEach(c=>CE.io.observe(c));
+}
+function ceAnim(card){
+  card.querySelectorAll('.ce-ring .v').forEach(c=>{requestAnimationFrame(()=>c.setAttribute('stroke-dashoffset',c.dataset.off))});
+  card.querySelectorAll('.ce-n').forEach(n=>{
+    const to=+n.dataset.to,dec=+n.dataset.dec;
+    if(RMQ.matches){n.textContent=fmtDec(to,dec);return}
+    const t0=performance.now(),D=1100;
+    const st=t=>{const k=Math.min(1,(t-t0)/D),e=1-Math.pow(1-k,3);n.textContent=fmtDec(to*e,dec);if(k<1)requestAnimationFrame(st)};
+    requestAnimationFrame(st);
+  });
+}
+/* confeti con los colores de la app; tocar a Deshi lanza más */
+function ceBurst(big){
+  if(!CE||RMQ.matches)return;
+  const cv=$('ceFx');if(!cv)return;
+  const W=innerWidth,H=innerHeight,dpr=Math.min(2,devicePixelRatio||1);
+  if(cv.width!==Math.round(W*dpr)||cv.height!==Math.round(H*dpr)){cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr)}
+  const cs=getComputedStyle(document.documentElement),cv0=v=>cs.getPropertyValue(v).trim();
+  const cols=[cv0('--tint'),cv0('--tint'),cv0('--ink'),cv0('--warn'),cv0('--belt'),Deshi.BELTS.azul].filter(Boolean);
+  const add=(x,y,ang,n,spd)=>{for(let k=0;k<n;k++){const a=ang+(Math.random()-.5)*.9,v=spd*(.55+Math.random()*.6);
+    CE.parts.push({x,y,vx:Math.cos(a)*v,vy:Math.sin(a)*v,r:Math.random()*6.3,vr:(Math.random()-.5)*.35,w:6+Math.random()*6,h:3+Math.random()*4,
+      c:cols[Math.floor(Math.random()*cols.length)],o:Math.random()<.25,ph:Math.random()*6.3})}};
+  if(big){add(-10,H*.62,-1.05,70,17);add(W+10,H*.62,-2.09,70,17);add(W/2,H*.32,-1.57,40,12)}
+  else{add(W/2,H*.3,-1.57,45,12);try{navigator.vibrate&&navigator.vibrate(25)}catch(e){}}
+  if(!CE.raf){let last=performance.now();const ctx=cv.getContext('2d');
+    const loop=t=>{if(!CE){return}const dt=Math.min(2.5,(t-last)/16.7);last=t;
+      ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,W,H);
+      CE.parts=CE.parts.filter(p=>p.y<H+30&&p.x>-40&&p.x<W+40);
+      CE.parts.forEach(p=>{p.vy+=.32*dt;p.vx*=Math.pow(.985,dt);p.vy*=Math.pow(.985,dt);p.x+=(p.vx+Math.sin(p.ph+=.12*dt)*.6)*dt;p.y+=p.vy*dt;p.r+=p.vr*dt;
+        ctx.save();ctx.translate(p.x,p.y);ctx.rotate(p.r);ctx.fillStyle=p.c;
+        if(p.o){ctx.beginPath();ctx.arc(0,0,p.h*.8,0,6.3);ctx.fill()}else{ctx.scale(1,Math.cos(p.ph));ctx.fillRect(-p.w/2,-p.h/2,p.w,p.h)}
+        ctx.restore()});
+      if(CE.parts.length)CE.raf=requestAnimationFrame(loop);else{CE.raf=0;ctx.clearRect(0,0,W,H)}};
+    CE.raf=requestAnimationFrame(loop)}
+}
+/* cuatro notas hacia arriba y una vibración; sin sonido si el móvil aún no ha dado permiso de audio */
+function fanfare(){
+  try{audioUnlock();const c=AC;if(c&&c.state==='running')[[523.25,0],[659.25,.12],[783.99,.24],[1046.5,.38]].forEach(([f,t],i)=>{
+    const o=c.createOscillator(),g=c.createGain(),s=c.currentTime+t,d=i===3?.7:.2;o.type='triangle';o.frequency.value=f;o.connect(g);g.connect(c.destination);
+    g.gain.setValueAtTime(0,s);g.gain.linearRampToValueAtTime(.16,s+.02);g.gain.exponentialRampToValueAtTime(.001,s+d);o.start(s);o.stop(s+d+.03)})}catch(e){}
+  try{navigator.vibrate&&navigator.vibrate([40,60,40,60,180])}catch(e){}
+}
+/* al abrir la app en un bloque nuevo: se celebra el último bloque terminado que tenga entrenos suficientes */
+function checkBlock(){
+  if(CE||!started||(SS&&SS.on)||!DB.cfg.start)return;
+  if(['onb','welcome','session'].some(id=>$(id)&&$(id).classList.contains('on'))||$('sheet').classList.contains('on'))return;
+  const L=blkLast(),cel=DB.cfg.cel||0;if(L<=cel)return;
+  let b=0;for(let k=L;k>cel;k--)if(blkSess(k).length>=BLK_MIN){b=k;break}
+  if(!b){DB.cfg.cel=L;save();return}                      // bloques sin apenas entrenos: se marcan sin fiesta
+  // se marca como celebrado solo cuando de verdad se enseña
+  setTimeout(()=>{if(CE||(SS&&SS.on)||$('sheet').classList.contains('on'))return;openCele(b,0,L)},400);
 }
 
 /* ═════ RUTINA ═════ */
@@ -1374,14 +1581,16 @@ function finishSession(){
 function renderDone(){
   const d=T(),p=PLAN[SS.day],s=sessStats(d),mins=DB.sess[d]?.dur||activeMin();
   const R=prData(),news=Object.keys(R).filter(id=>R[id].d===d&&(SS.R0[id]==null||R[id].v>SS.R0[id]));
-  const P=planWeek(),done=Object.keys(P.map).length,nx=nextSession(P);
+  const P=planWeek(),done=Object.keys(P.map).length,nx=nextSession(P),eb=blkEndsToday(),cb=eb&&blkNew(eb)?eb:0;
   $('session').innerHTML='<div class="fullin"><div style="display:flex;justify-content:center;margin-top:28px">'+dkStage('cheer',3)+'</div>'+
     '<h1 class="t1 center" style="margin-top:22px">Sesión completada</h1><p class="sb l2 center" style="margin-top:4px">'+esc(p.n)+' · '+mins+' min · '+done+' de '+dayKeys().length+' esta semana</p>'+
     '<div class="stack" style="margin-top:22px"><div class="card row" style="gap:0">'+[['Series',s.n,''],['Volumen',fmtNum(s.ton),' kg'],['Tiempo',mins,' min']].map(([l,v,u],i)=>
       '<div class="grow center" style="padding:13px 8px 12px'+(i?';border-left:.5px solid var(--sep)':'')+'"><p class="fn l2">'+l+'</p><p class="t2 num">'+v+'<span class="sb l3 semi">'+u+'</span></p></div>').join('')+'</div>'+
     news.slice(0,3).map(id=>'<div class="card row" style="padding:14px 16px;gap:13px"><span class="ic tint" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center">'+ic('trophy',22)+'</span><div class="grow"><p class="fn ink semi">Nuevo récord</p><p class="hl num">'+esc(exName(id))+' · '+esc(R[id].lbl)+'</p></div></div>').join('')+
-    (nx?'<div class="card row" style="padding:14px 16px;gap:13px"><span class="ic gray" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center">'+ic('cal',18)+'</span><div class="grow"><p class="fn l2">Próxima sesión</p><p class="hl">'+esc(PLAN[nx.n].n)+' · '+nx.when+'</p></div></div>':'')+
-    '</div><div class="foot"><button class="btn pri lg" onclick="closeSession()">Listo</button></div></div>';a11ySess();
+    (cb?'<div class="card row ce-tease" style="padding:14px 16px;gap:13px"><span class="ic tint" style="width:40px;height:40px;border-radius:12px;display:grid;place-items:center">'+ic('star',20)+'</span><div class="grow"><p class="fn ink semi">Último entreno del bloque '+cb+'</p><p class="hl">Has completado las 12 semanas</p></div></div>'
+      :(nx?'<div class="card row" style="padding:14px 16px;gap:13px"><span class="ic gray" style="width:34px;height:34px;border-radius:10px;display:grid;place-items:center">'+ic('cal',18)+'</span><div class="grow"><p class="fn l2">Próxima sesión</p><p class="hl">'+esc(PLAN[nx.n].n)+' · '+nx.when+'</p></div></div>':''))+
+    '</div><div class="foot">'+(cb?'<button class="btn pri lg" onclick="closeSession();openCele('+cb+')">'+ic('star',18)+'Ver mis 12 semanas</button><button class="btn tx" onclick="closeSession()">Ahora no</button>'
+      :'<button class="btn pri lg" onclick="closeSession()">Listo</button>')+'</div></div>';a11ySess();
 }
 function openSessMenu(){
   const p=PLAN[SS.day],log=DB.sess[T()]?.ex||{};

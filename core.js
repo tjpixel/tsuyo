@@ -337,7 +337,8 @@ function sanitizeDB(r){
     force:c.force==null?null:Math.round(sNum(c.force,0,6)||0),
     mods:{diet:!!(c.mods&&c.mods.diet),body:!!(c.mods&&c.mods.body)},
     supps:(Array.isArray(c.supps)?c.supps:[]).filter(x=>isObj(x)&&RX_ID.test(x.id)).slice(0,30).map(x=>({id:x.id,t:sStr(x.t,40)||'Suplemento',s:sStr(x.s,60)})),
-    tour:c.tour?1:0};
+    tour:c.tour?1:0,
+    cel:Math.round(sNum(c.cel,0,999)||0)};                 // último bloque de 12 semanas ya celebrado
   // primer entreno: día y hora que eligió (para el aviso en Hoy y el calendario)
   if(isObj(c.first)&&RX_DATE.test(c.first.d)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(c.first.t||''))out.cfg.first={d:c.first.d,t:c.first.t};
   if(!out.cfg.avail.length)out.cfg.avail=f.avail.slice();
@@ -356,11 +357,11 @@ const T=()=>today();
 function weekNo(){
   if(!DB.cfg.start)return null;
   const s=new Date(DB.cfg.start+'T00:00:00'),n=new Date(T()+'T00:00:00');
-  return Math.floor((n-s)/864e5/7)+1;
+  return Math.floor(Math.round((n-s)/864e5)/7)+1;           // redondeo: el cambio de hora no descuadra la semana
 }
 function wkOfDate(dt){
   if(!DB.cfg.start)return null;
-  return Math.floor((new Date(dt+'T00:00:00')-new Date(DB.cfg.start+'T00:00:00'))/864e5/7)+1;
+  return Math.floor(Math.round((new Date(dt+'T00:00:00')-new Date(DB.cfg.start+'T00:00:00'))/864e5)/7)+1;
 }
 function isDeloadDate(dt){const w=wkOfDate(dt);return !!(w&&w>0&&((w-1)%12)+1===11)}
 function blockInfo(){
