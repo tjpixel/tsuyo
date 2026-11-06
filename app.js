@@ -459,9 +459,9 @@ function prVal(e,sets){
 }
 function blkSummary(b){
   const R=blkRange(b),ds=blkSess(b),need=Math.max(1,Math.ceil(perWeek()*.75));
-  let sets=0,ton=0,min=0;const wk=Array(12).fill(0),hist={};
+  let sets=0,ton=0,min=0,nDur=0;const wk=Array(12).fill(0),hist={};
   ds.forEach(d=>{
-    const s=DB.sess[d];wk[Math.min(11,Math.floor(dDays(R.s,d)/7))]++;if(s.dur)min+=s.dur;
+    const s=DB.sess[d];wk[Math.min(11,Math.floor(dDays(R.s,d)/7))]++;if(s.dur){min+=s.dur;nDur++}
     Object.entries(s.ex||{}).forEach(([id,a])=>{
       (a||[]).forEach(x=>{if(x&&x.r){sets++;ton+=(x.w||0)*x.r}});
       const e=exBase(id);if(!e)return;const v=exBest(e,a);if(v!=null)(hist[id]=hist[id]||[]).push(v);
@@ -478,7 +478,7 @@ function blkSummary(b){
   // cinturón al empezar y al acabar
   const by=weekCounts(),good=lim=>Object.keys(by).filter(w=>w<lim&&by[w]>=need).length;
   const beltOf=n=>{let i=0;BELT_STEPS.forEach((x,k)=>{if(n>=x[2])i=k});return BELT_STEPS[i]};
-  return{b,R,n:ds.length,plan:perWeek()*12,sets,ton,min,wk,need,good:wk.filter(x=>x>=need).length,gains,recs,
+  return{b,R,n:ds.length,plan:perWeek()*12,sets,ton,min,nDur,wk,need,good:wk.filter(x=>x>=need).length,gains,recs,
     b0:beltOf(good(mondayOf(R.s))),b1:beltOf(good(R.e))};
 }
 
@@ -515,7 +515,8 @@ function openCele(b,rev,mark){
     '<div class="grow"><p class="fn l2">Sesiones</p><p class="ce-num num">'+cnt(S.n)+'</p><p class="sb l2">de '+S.plan+' previstas</p></div></div>';
   // horas, series y peso movido
   const tiles=[];
-  if(S.min)tiles.push(['Horas',cnt(r2(hrs).toFixed(hrD),hrD),' h']);
+  // las horas solo si casi todas las sesiones guardan su duración (las importadas pueden no tenerla)
+  if(S.min&&S.nDur>=S.n*.8)tiles.push(['Horas',cnt(r2(hrs).toFixed(hrD),hrD),' h']);
   tiles.push(['Series',cnt(S.sets),'']);
   if(S.ton>=1000)tiles.push(['Peso movido',cnt(ton.toFixed(tonD),tonD),' t']);else if(S.ton)tiles.push(['Peso movido',cnt(Math.round(S.ton)),' kg']);
   h+='<div class="card ce-in" style="overflow:hidden"><div class="row" style="gap:0">'+tiles.map(([l,v,u],i)=>
