@@ -1605,11 +1605,16 @@ function openSessMenu(){
     '<div class="group" style="margin-top:18px"><button class="cell" onclick="askRestart()"><span class="ic gray">'+ic('redo',17)+'</span><div class="cb"><div class="tt"><p class="bd">Empezar de cero</p><p class="fn l2">Borra lo anotado hoy y el reloj vuelve a 0:00</p></div></div></button>'+
     '<button class="cell" onclick="askDiscard()"><span class="ic red">'+ic('trash',17)+'</span><div class="cb"><div class="tt"><p class="bd red">Descartar la sesión</p><p class="fn l2">Como si no la hubieras empezado</p></div></div></button></div></div>'}));
 }
+/* ir a otro ejercicio desde el menú ⋯: si hay un descanso en marcha (en pantalla o en la cápsula), sigue en la cápsula,
+   igual que con «Preparar el siguiente». Se acaba solo, al anotar una serie o al empezar una plancha o un cardio. */
 function jumpTo(i){
-  if(SS.paused){SS.paused=false;SS.pauseAt=0;SS.runAt=Date.now();sessPersist();keepAwake(true)}
-  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();SS.tEnd=0;SS.bg=false;SS.ei=i;SS.si=0;SS.preRest=false;SS.wKey=null;
+  const now=Date.now();
+  if(SS.paused){if(SS.tEnd&&SS.pauseAt)SS.tEnd+=now-SS.pauseAt;SS.paused=false;SS.pauseAt=0;SS.runAt=now;SS.prevL=null;sessPersist();keepAwake(true)}
+  const keep=SS.tEnd>now&&(SS.ph==='rest'||SS.bg);
+  const e=PLAN[SS.day].ex[i],s=setsFor(e);stopTimer();if(keep)SS.bg=true;else{SS.tEnd=0;SS.bg=false}
+  SS.ei=i;SS.si=0;SS.preRest=false;SS.sw=false;SS.wKey=null;
   for(let j=0;j<nSteps(e);j++){SS.si=j;if(!(s[j]&&s[j].r))break}
-  SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false;SS.wOn=false;closeSheet();renderSession();renderAcc();
+  SS.ph='set';SS.ann=null;SS.last=0;SS.w=null;SS.mins=null;SS.sp=null;SS.wAcc=0;SS.cDone=false;SS.wOn=false;closeSheet();renderSession();renderAcc();if(keep)startTick();
 }
 function renderAcc(){
   const a=$('acc'),on=SS.on&&SS.min&&started;a.hidden=!on;
