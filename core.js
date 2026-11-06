@@ -404,6 +404,12 @@ function lastFor(id){
   for(const k of ks){if(k===curDate)continue;const r=hit(k);if(r)return r}
   return null;
 }
+/* ¿has hecho este ejercicio en la semana ligera después de «ref» (la última sesión normal)? Entonces, ya fuera
+   de la semana ligera, «la última vez» de verdad fue la ligera y el consejo dice que habla de la de antes */
+function afterLight(id,ref){
+  if(!ref||isLightWk()||isDeloadDate(ref))return false;
+  return Object.keys(DB.sess).some(k=>k>ref&&k!==curDate&&isDeloadDate(k)&&(DB.sess[k]?.ex?.[id]||[]).some(x=>x&&x.r));
+}
 /* repeticiones de la última vez; en ejercicios por lados se agrupan izquierda/derecha para no parecer el doble de series */
 function repsTxt(e,sets,un){
   un=un?' '+un:'';
@@ -553,36 +559,41 @@ function advise(e){
     const lw=snapW(mx*0.65,e.inc);
     return{txt:SL+'Usa <b>'+fmtSp(lw)+' kg</b> ('+pctTxt(lw,mx)+' de '+fmtSp(mx)+'), mismas series y repeticiones, RIR&nbsp;4.',up:false,w:lw};
   }
+  /* después de la semana ligera la referencia sigue siendo la última sesión normal, la de antes: el consejo lo dice
+     («Antes de la semana ligera…») para que no parezca que habla de la sesión ligera */
+  const AL=afterLight(e.id,L.d),BL='Antes de la semana ligera';
+  const UV=AL?BL+': ':'Última vez ',UVc=AL?BL+': ':'Última vez: ';
+  const TOP=t=>AL?BL+' llegaste al techo'+(t?': '+t:'')+'. ':'Techo alcanzado. ';
   if(e.spd){
     const sp=done.map(x=>x.sp).filter(x=>x);
-    if(!sp.length)return{txt:'Última vez: '+repsTxt(e,L.sets)+' min. Anota la velocidad para poder progresar.',up:false,w:''};
-    return{txt:'Última vez '+Math.max(...sp)+' km/h durante '+done[0].r+' min. <b>Sube la velocidad, no los minutos.</b>',up:false,w:''};
+    if(!sp.length)return{txt:UVc+repsTxt(e,L.sets)+' min. Anota la velocidad para poder progresar.',up:false,w:''};
+    return{txt:UV+fmtSp(Math.max(...sp))+' km/h durante '+done[0].r+' min. <b>Sube la velocidad, no los minutos.</b>',up:false,w:''};
   }
   if(e.bw){
     const un=e.min?'min':'s',pl=e.side?' por lado':'';
     if(e.seg&&e.rup===L.d&&e.rhi===e.hi)
-      return{txt:'Llegaste al tope en todas las series. <b>El objetivo sube a '+e.lo+'–'+e.hi+' '+un+'</b>'+pl+'.',up:true,w:''};
+      return{txt:(AL?BL+' llegaste':'Llegaste')+' al tope en todas las series. <b>El objetivo sube a '+e.lo+'–'+e.hi+' '+un+'</b>'+pl+'.',up:true,w:''};
     if(allTop){
       const ex=e.seg&&e.hi>=RANGE_CAP?'Ya aguantas '+e.hi+' '+un+pl+': más tiempo ya no suma tanto. ':'';
-      return{txt:'Techo alcanzado. '+ex+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
+      return{txt:TOP(repsTxt(e,L.sets,e.seg?un:'reps'))+ex+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
     }
     if(e.seg){
       const sh=shortTxt(e,L.sets,un);
-      return{txt:'Última vez: '+repsTxt(e,L.sets,un)+'. '+(sh?sh+' Hoy, <b>'+e.hi+' '+un+pl+'</b> en todas.':'Aguanta un poco más cada vez hasta '+e.hi+' '+un+pl+' en todas las series.'),up:false,w:''};
+      return{txt:UVc+repsTxt(e,L.sets,un)+'. '+(sh?sh+' Hoy, <b>'+e.hi+' '+un+pl+'</b> en todas.':'Aguanta un poco más cada vez hasta '+e.hi+' '+un+pl+' en todas las series.'),up:false,w:''};
     }
-    return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Peso corporal — suma repeticiones.',up:false,w:''};
+    return{txt:UVc+repsTxt(e,L.sets)+'. Peso corporal — suma repeticiones.',up:false,w:''};
   }
   if(e.opt&&!mx){
-    if(allTop)return{txt:'Techo alcanzado. '+e.prog,up:true,w:e.inc};
-    return{txt:'Última vez sin peso → '+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
+    if(allTop)return{txt:TOP(repsTxt(e,L.sets,'reps'))+e.prog,up:true,w:e.inc};
+    return{txt:(AL?BL+', sin peso → ':'Última vez sin peso → ')+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
   }
   if(allTop&&e.inc>0){const cz=careZones(e);
-    if(cz.length&&!topAt(e,prevFor(e.id,L.d),mx)){const sw=snapW(mx,e.inc);return{txt:'Techo alcanzado. Como cuidas '+zTxt(cz)+', <b>repite '+fmtSp(sw)+' kg</b> una sesión más; si vuelves a llegar arriba, subimos.',up:false,w:sw}}
+    if(cz.length&&!topAt(e,prevFor(e.id,L.d),mx)){const sw=snapW(mx,e.inc);return{txt:TOP(fmtSp(mx)+' kg → '+repsTxt(e,L.sets))+'Como cuidas '+zTxt(cz)+', <b>repite '+fmtSp(sw)+' kg</b> una sesión más; si vuelves a llegar arriba, subimos.',up:false,w:sw}}
   }
-  if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:'Techo alcanzado. Sube a <b>'+nw+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
-  if(e.inc===0)return{txt:'Última vez: '+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
-  if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. '+(isMaq(e)?'Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',','):'Vas en saltos de '+String(e.inc).replace('.',',')+' kg')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
-  return{txt:'Última vez '+mx+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
+  if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:TOP(fmtSp(mx)+' kg → '+repsTxt(e,L.sets))+'Sube a <b>'+fmtSp(nw)+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
+  if(e.inc===0)return{txt:UVc+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
+  if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:UV+fmtSp(mx)+' kg → '+repsTxt(e,L.sets)+'. '+(isMaq(e)?'Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',','):'Vas en saltos de '+String(e.inc).replace('.',',')+' kg')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
+  return{txt:UV+fmtSp(mx)+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
 }
 
 function prData(){
