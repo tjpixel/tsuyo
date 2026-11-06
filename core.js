@@ -44,6 +44,8 @@ const EXC={
  // ── BRAZOS
  curl:{n:'Curl de bíceps',g:'Brazos',s:3,lo:10,hi:14,r:75,inc:1,k:['Codos pegados al cuerpo','Sube sin balancear el tronco','Aprieta arriba','Baja lento hasta extender']},
  triceps:{n:'Extensión de tríceps en polea',g:'Brazos',s:3,lo:10,hi:14,r:75,inc:2.5,k:['Codos pegados al costado','Solo se mueve el antebrazo','Extiende del todo abajo','Vuelve sin despegar los codos']},
+ curlmart:{n:'Curl martillo con cuerda',g:'Brazos',s:3,lo:10,hi:14,r:75,inc:2.5,tip:'Agarre neutro, palmas enfrentadas: trabaja también el antebrazo y suele cargar menos la muñeca',k:['Cuerda en la polea baja','Palmas enfrentadas todo el recorrido','Codos pegados al cuerpo','Sube sin balancear el tronco','Baja lento hasta extender']},
+ tricepsov:{n:'Tríceps por encima de la cabeza en polea',g:'Brazos',s:3,lo:10,hi:14,r:75,inc:2.5,tip:'Con el brazo arriba trabaja más la cabeza larga del tríceps',k:['Cuerda en la polea baja, de espaldas a ella','Un pie adelantado, abdomen firme','Codos junto a la cabeza, apuntando arriba','Extiende hasta estirar los brazos','Baja lento sin abrir los codos']},
  // ── CORE
  plancha:{n:'Plancha',g:'Core',s:3,lo:30,hi:45,r:75,inc:0,seg:1,bw:1,prog:'Sube la dificultad: eleva un pie o alarga la palanca.',k:['Codos justo bajo los hombros','Cuerpo en línea de hombros a talones','Aprieta abdomen y glúteos','Pelvis neutra: ni hundir ni arquear','Respiración constante']},
  plancL:{n:'Plancha lateral',g:'Core',s:3,lo:20,hi:35,r:60,inc:0,seg:1,side:1,bw:1,prog:'Pies apilados o eleva el brazo libre.',k:['Codo justo bajo el hombro','Eleva la cadera hasta alinear cabeza, tronco y pies','Aprieta los glúteos','No dejes caer la pelvis']},
@@ -419,7 +421,7 @@ function shortTxt(e,sets,un){
 }
 /* ejercicios que se hacen en máquina o polea: solo en estos se habla de «tu máquina».
    El resto (barra, mancuernas, kettlebell, disco sobre la cadera…) habla de saltos de peso. */
-const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','crunchpol','pallof']);
+const MAQ=new Set(['prensa','hack','extcuad','femoral','gemelo','kickb','abduc','pressp','aperturas','jalon','remo','remopolea','facepull','pressh','triceps','curlmart','tricepsov','crunchpol','pallof']);
 const isMaq=e=>!!(e&&MAQ.has(e.id));
 
 /* ═════ ZONAS QUE CUIDAR ═════
@@ -433,7 +435,7 @@ const ZEX={
  hipth:['cadera','espalda'],puente:['cadera'],kickb:['cadera','espalda'],abduc:['cadera'],
  banca:['hombro','codo','muneca'],pressmanc:['hombro','codo','muneca'],pressp:['hombro','codo'],aperturas:['hombro'],flexiones:['hombro','muneca','codo'],
  dominadas:['hombro','codo'],jalon:['hombro','codo'],remobarra:['espalda','codo'],remo:['codo'],remopolea:['espalda','codo'],remomanc:['codo'],facepull:['hombro'],
- militar:['hombro','espalda','codo'],pressh:['hombro','codo'],laterales:['hombro'],curl:['codo','muneca'],triceps:['codo'],
+ militar:['hombro','espalda','codo'],pressh:['hombro','codo'],laterales:['hombro'],curl:['codo','muneca'],triceps:['codo'],curlmart:['codo'],tricepsov:['codo','hombro'],
  plancha:['hombro','espalda'],plancL:['hombro'],crunchpol:['espalda'],elevp:['hombro'],
  stepup:['rodilla','tobillo'],salto:['rodilla','tobillo'],swing:['espalda','cadera'],colgado:['hombro','muneca']
 };
