@@ -1,5 +1,5 @@
 /* Tsuyo · funciona sin conexión: la app se guarda en el móvil; los datos van aparte */
-const V='tsuyo-v26';
+const V='tsuyo-v27';
 const CORE=['./','index.html','core.js','data.js','foods.js','comida.js','app.js','deshi.js','vendor/supabase-2.117.2.js','fonts/syne.woff2','manifest.webmanifest','icons/icon-192.png','icons/apple-touch-icon.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(V).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting()))});
 // solo borra versiones viejas de Tsuyo: las hermanas viven en la misma dirección y comparten este almacén

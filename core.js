@@ -347,7 +347,8 @@ function sanitizeDB(r){
   // primer entreno: día y hora que eligió (para el aviso en Hoy y el calendario)
   if(isObj(c.first)&&RX_DATE.test(c.first.d)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(c.first.t||''))out.cfg.first={d:c.first.d,t:c.first.t};
   // comida: peso (kg) y gramos de proteína por kilo
-  if(isObj(c.food)){const kg=sNum(c.food.kg,30,300),gk=sNum(c.food.gk,1.2,2.2);if(kg)out.cfg.food={kg:Math.round(kg*10)/10,gk:gk?Math.round(gk*10)/10:1.6}}
+  // gk solo cuenta si la persona lo puso a mano (man); si no, Tsuyo lo pone según el objetivo (comida.js)
+  if(isObj(c.food)){const kg=sNum(c.food.kg,30,300),gk=sNum(c.food.gk,1.2,2.2);if(kg){out.cfg.food={kg:Math.round(kg*10)/10};if(c.food.man&&gk){out.cfg.food.gk=Math.round(gk*10)/10;out.cfg.food.man=1}}}
   if(!out.cfg.avail.length)out.cfg.avail=f.avail.slice();
   return out;
 }

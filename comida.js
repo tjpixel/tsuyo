@@ -2,7 +2,8 @@
    Una sola cifra que importa: la proteína del día, calculada con el peso (1,6 g por kilo por defecto, hasta 2,2).
    Lo que cuenta es el total del día y la media de la semana; nada se pinta en rojo y no hay rachas.
    Los alimentos de la lista vienen de la tabla Ciqual 2025 (foods.js). Se apuntan con habituales, buscando o «a ojo».
-   Datos: DB.cfg.mods.diet (encendido), DB.cfg.food = {kg, gk}, DB.diet[día].items = [{n,id,g,k,p,c,f,t}].
+   Datos: DB.cfg.mods.diet (encendido), DB.cfg.food = {kg, gk, man}, DB.diet[día].items = [{n,id,g,k,p,c,f,t}].
+   Los gramos por kilo los pone Tsuyo según el objetivo (1,6; 2,2 al bajar grasa). Solo si man = 1 manda el gk que eligió la persona.
    Se carga antes que app.js: las funciones de la app (openSheet, ic, $…) solo se usan al llamar. */
 'use strict';
 
@@ -10,7 +11,10 @@
 const FOOD_BY={};FOODS.forEach(x=>{FOOD_BY['c'+x[0]]=x});
 const GK_OPTS=[1.6,1.8,2,2.2];
 const foodOn=()=>!!(DB&&DB.cfg&&DB.cfg.mods&&DB.cfg.mods.diet);
-const foodCfg=()=>Object.assign({gk:1.6},DB.cfg.food||{});
+/* 1,6 g/kg: por encima, de media ya no se gana más músculo (Morton y otros, 2018).
+   2,2 g/kg al bajar grasa: en déficit, más proteína ayuda a no perder músculo (ISSN 2017; Helms y otros, 2014). */
+const autoGk=()=>DB.profile&&DB.profile.goal==='grasa'?2.2:1.6;
+const foodCfg=()=>{const f=Object.assign({},DB.cfg.food||{});if(!f.man||!f.gk)f.gk=autoGk();return f};
 /* objetivo de proteína en gramos al día: peso × g/kg; sin peso no hay objetivo */
 function protGoal(){const f=foodCfg();return f.kg?Math.round(f.kg*f.gk):0}
 const dayItems=d=>((DB.diet[d]||{}).items||[]);
@@ -105,27 +109,35 @@ function foodHoyCard(){
 /* ═════ OBJETIVO: PESO Y GRAMOS POR KILO ═════ */
 let FSET=null;
 function openFoodSetup(){
-  const f=foodCfg();FSET={kg:f.kg||'',gk:f.gk};
+  const f=foodCfg();FSET={kg:f.kg||'',gk:f.gk,man:!!f.man,open:!!f.man};
   openSheet(foodSetupSheet,$('sheet').classList.contains('on'));
 }
+const fsGk=()=>FSET.man?FSET.gk:autoGk();
+function foodWhy(gk,man){
+  if(man)return 'Cifra puesta a mano. 1,6 basta para la mayoría: comer más no suma más músculo.';
+  return gk>=2.2?'2,2 g por kilo: mientras bajas grasa, algo más de proteína ayuda a no perder músculo.':'1,6 g por kilo, lo que basta para ganar músculo. Comer más no suma más músculo.';
+}
+const foodGoalTxt=(g,gk,man)=>g?'<p class="fn l2">Tu objetivo</p><p class="t1 num rnd">'+g+' g al día</p><p class="fn l2 balance" style="margin-top:4px">'+foodWhy(gk,man)+'</p>':'<p class="fn l2">Escribe tu peso para ver tu objetivo</p>';
 function foodSetupSheet(){
-  const on=foodOn(),kg=parseFloat(String(FSET.kg).replace(',','.')),ok=kg>=30&&kg<=300,goal=ok?Math.round(kg*FSET.gk):0;
+  const on=foodOn(),kg=parseFloat(String(FSET.kg).replace(',','.')),ok=kg>=30&&kg<=300,gk=fsGk(),goal=ok?Math.round(kg*gk):0,G=GOALS[DB.profile.goal];
   return{title:'Comida',body:'<div class="pad">'+
     '<p class="sb l2 center balance" style="padding:0 8px 16px">Tsuyo te pone una sola cifra: la proteína del día. Lo que cuenta es la media de la semana, no un día suelto.</p>'+
     '<div class="field"><label for="fKg">Tu peso (kg)</label><input id="fKg" type="text" inputmode="decimal" autocomplete="off" maxlength="5" value="'+esc(FSET.kg)+'" placeholder="Por ejemplo, 75" oninput="FSET.kg=this.value;foodSetupLive()"></div>'+
-    '<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">Gramos por kilo</p>'+
-    '<div class="segc" role="group" aria-label="Gramos de proteína por kilo">'+GK_OPTS.map(x=>'<button class="'+(FSET.gk===x?'on':'')+'" onclick="FSET.gk='+x+';drawSheet()" aria-pressed="'+(FSET.gk===x)+'">'+fmtG(x)+'</button>').join('')+'</div>'+
-    '<p class="fn l2" style="padding:8px 6px 0">1,6 basta para la mayoría. Sube si quieres margen, por ejemplo al bajar grasa.</p>'+
-    '<div class="card center" style="margin-top:16px;padding:14px" id="fGoal" aria-live="polite">'+foodGoalTxt(goal)+'</div>'+
-    '<div class="stack" style="margin-top:18px"><button class="btn pri" id="fSave" onclick="saveFoodSetup()"'+(ok?'':' disabled')+'>'+(on?'Guardar':'Activar Comida')+'</button>'+
+    '<div class="card center" style="margin-top:16px;padding:16px 16px 14px" id="fGoal" aria-live="polite">'+foodGoalTxt(goal,gk,FSET.man)+'</div>'+
+    '<p class="fn l2 center" style="padding:10px 6px 0">'+(G?'Según tu objetivo: '+esc(G.n.toLowerCase())+'. Si lo cambias en Tú, la cifra cambia sola.':'Pon tu objetivo en Tú para ajustar la cifra.')+'</p>'+
+    (FSET.open?'<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">Gramos por kilo</p>'+
+      '<div class="segc" role="group" aria-label="Gramos de proteína por kilo">'+GK_OPTS.map(x=>'<button class="'+(FSET.man&&FSET.gk===x?'on':'')+'" onclick="FSET.man=true;FSET.gk='+x+';drawSheet()" aria-pressed="'+(FSET.man&&FSET.gk===x)+'">'+x.toFixed(1).replace('.',',')+'</button>').join('')+'</div>'+
+      '<p class="fn l2" style="padding:8px 6px 0">Cámbiala solo si sigues un plan de un dietista-nutricionista.</p>'+
+      (FSET.man?'<button class="btn tx" onclick="FSET.man=false;FSET.open=false;drawSheet()">Usar la cifra de Tsuyo</button>':'')
+      :'<button class="btn tx" onclick="FSET.open=true;drawSheet()">Cambiar la cifra</button>')+
+    '<div class="stack" style="margin-top:14px"><button class="btn pri" id="fSave" onclick="saveFoodSetup()"'+(ok?'':' disabled')+'>'+(on?'Guardar':'Activar Comida')+'</button>'+
     (on?'<button class="btn sec" onclick="askFoodOff()">Apagar Comida</button>':'')+'</div>'+
     '<p class="fn l2" style="padding:14px 6px 0">En pruebas y gratis mientras se prueba. Si tienes una enfermedad renal o tu médico te ha limitado la proteína, consúltalo antes. Tu peso y lo que apuntas se quedan en este móvil.</p></div>'};
 }
-const foodGoalTxt=g=>g?'<p class="fn l2">Tu objetivo</p><p class="t1 num">'+g+' g al día</p>':'<p class="fn l2">Escribe tu peso para ver tu objetivo</p>';
-function foodSetupLive(){const kg=parseFloat(String(FSET.kg).replace(',','.')),ok=kg>=30&&kg<=300;$('fGoal').innerHTML=foodGoalTxt(ok?Math.round(kg*FSET.gk):0);$('fSave').disabled=!ok}
+function foodSetupLive(){const kg=parseFloat(String(FSET.kg).replace(',','.')),ok=kg>=30&&kg<=300,gk=fsGk();$('fGoal').innerHTML=foodGoalTxt(ok?Math.round(kg*gk):0,gk,FSET.man);$('fSave').disabled=!ok}
 function saveFoodSetup(){
   const kg=Math.round(parseFloat(String(FSET.kg).replace(',','.'))*10)/10;if(!(kg>=30&&kg<=300)){toast('Escribe un peso entre 30 y 300 kg');return}
-  const was=foodOn();DB.cfg.food={kg,gk:FSET.gk};DB.cfg.mods=Object.assign({},DB.cfg.mods,{diet:true});save();closeSheet();applyFoodTab();
+  const was=foodOn();DB.cfg.food=FSET.man?{kg,gk:FSET.gk,man:1}:{kg};DB.cfg.mods=Object.assign({},DB.cfg.mods,{diet:true});save();closeSheet();applyFoodTab();
   if(!was){FD=T();go('comida');toast('Comida activada');say('Comida activada. Tu objetivo: '+protGoal()+' gramos de proteína al día')}else{render();toast('Objetivo: '+protGoal()+' g al día')}
 }
 function askFoodOff(){confirmSheet('Apagar Comida','Desaparece la pestaña Comida. Lo que has apuntado se guarda y vuelve si la activas otra vez.','Apagar','foodOff()')}
