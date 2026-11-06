@@ -249,7 +249,7 @@ function unskipToday(){
   save();renderHoy();toast('Marca retirada');
 }
 
-function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},wu:{},sess:{},skips:{},supp:{},diet:{},bodyEnc:null,cfg:{
+function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},wu:{},sess:{},skips:{},supp:{},diet:{},mine:{},bodyEnc:null,cfg:{
   start:'',k:2000,p:120,f:65,c:220,avail:[1,3,5],force:null,mods:{diet:false,body:false},supps:[]
 }}}
 function mergeDefaults(o){
@@ -257,7 +257,7 @@ function mergeDefaults(o){
   const r=Object.assign(d,o);
   r.cfg=Object.assign(freshDB().cfg,o.cfg||{});
   r.cfg.mods=Object.assign({diet:false,body:false},(o.cfg||{}).mods||{});
-  ['cex','inc','wu','sess','skips','supp','diet','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
+  ['cex','inc','wu','sess','skips','supp','diet','mine','profile'].forEach(k=>{if(!r[k]||typeof r[k]!=='object')r[k]={}});
   delete r.body;                                  // las medidas nunca viajan en claro
   return sanitizeDB(r);
 }
@@ -326,9 +326,20 @@ function sanitizeDB(r){
     out.diet[d]={items:(Array.isArray(v.items)?v.items:[]).filter(isObj).slice(0,200).map(x=>{
       const o={n:sStr(x.n,60)||'Alimento',k:sNum(x.k,0,10000)||0,p:sNum(x.p,0,1000)||0};
       // comida (desde tsuyo-v26): de dónde sale (c+código Ciqual o q = a ojo), gramos, hidratos, grasa y hora
-      if(typeof x.id==='string'&&/^(c\d{1,6}|q)$/.test(x.id))o.id=x.id;
-      [['g',0,5000],['c',0,1000],['f',0,1000]].forEach(([k,a,b])=>{const n=sNum(x[k],a,b);if(n!=null)o[k]=n});
+      // m + id = de Mis platos (desde tsuyo-v28), con r = raciones
+      if(typeof x.id==='string'&&/^(c\d{1,6}|q|m[0-9a-z]{1,12})$/.test(x.id))o.id=x.id;
+      [['g',0,5000],['c',0,1000],['f',0,1000],['r',0.25,20]].forEach(([k,a,b])=>{const n=sNum(x[k],a,b);if(n!=null)o[k]=n});
       if(/^([01]\d|2[0-3]):[0-5]\d$/.test(x.t||''))o.t=x.t;return o})}});
+  // mis platos y productos (desde tsuyo-v28): valores por ración; p100… si vienen de una etiqueta por 100 g; parts = alimentos de la lista
+  out.mine={};if(isObj(r.mine))Object.entries(r.mine).slice(0,150).forEach(([id,m])=>{
+    if(!/^m[0-9a-z]{1,12}$/.test(id)||!isObj(m))return;
+    const o={n:sStr(m.n,60)||'Mi plato',p:sNum(m.p,0,500)||0,k:Math.round(sNum(m.k,0,10000)||0)};
+    [['c',0,1000],['f',0,1000],['g',1,5000],['p100',0,100],['k100',0,1000],['c100',0,100],['f100',0,100]].forEach(([k,a,b])=>{const n=sNum(m[k],a,b);if(n!=null)o[k]=Math.round(n*10)/10});
+    if(m.u==='ml')o.u='ml';if(typeof m.code==='string'&&/^\d{8,14}$/.test(m.code))o.code=m.code;if(m.src==='off')o.src='off';
+    if(m.b)o.b=sStr(m.b,40);
+    if(Array.isArray(m.parts)){const P=m.parts.filter(q=>Array.isArray(q)&&/^c\d{1,6}$/.test(q[0])&&sNum(q[1],1,2000)).slice(0,20).map(q=>[q[0],Math.round(sNum(q[1],1,2000))]);if(P.length)o.parts=P}
+    o.ts=Math.round(sNum(m.ts,0,9e15)||0);out.mine[id]=o;
+  });
   // medidas cifradas: solo base64
   const E=r.bodyEnc;out.bodyEnc=null;
   if(isObj(E)&&RX_B64.test(E.salt||'')&&RX_B64.test(E.iv||'')&&RX_B64.test(E.ct||''))

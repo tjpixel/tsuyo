@@ -15,6 +15,7 @@ const IC={
   food:'<path d="M12 7.6c-1.6-1.3-5.6-1.6-6.7 2.2-1 3.6 1.3 9.4 4.2 9.9 1 .2 1.5-.4 2.5-.4s1.5.6 2.5.4c2.9-.5 5.2-6.3 4.2-9.9-1.1-3.8-5.1-3.5-6.7-2.2z"/><path d="M12 7.6c0-2 1-3.6 3.1-4.1"/>',
   heart:'<path d="M12 20s-7.6-4.6-7.6-10.3A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.6 2.4C19.6 15.4 12 20 12 20z"/>',
   trophy:'<path d="M8 4.5h8v4.2a4 4 0 0 1-8 0z"/><path d="M8 6.2H5.6a2.6 2.6 0 0 0 2.6 3.2M16 6.2h2.4a2.6 2.6 0 0 1-2.6 3.2"/><path d="M12 12.7v3.3M9 20h6M10 16h4v4h-4z"/>',
+  scan:'<path d="M4 8V6a2 2 0 0 1 2-2h2M16 4h2a2 2 0 0 1 2 2v2M20 16v2a2 2 0 0 1-2 2h-2M8 20H6a2 2 0 0 1-2-2v-2"/><path d="M8 9v6M11 9v6M14 9v6M17 9v6"/>',
   pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
   clock:'<circle cx="12" cy="13" r="7.5"/><path d="M12 9.5V13l2.5 1.5M10 3h4"/>',
   bolt:'<path d="M13.2 3L5.6 13.4h5.6L10.4 21l8-10.6h-5.6z"/>',
@@ -839,7 +840,8 @@ function downloadData(){
 function openPrivacy(){
   openSheet(()=>({title:'Privacidad',body:'<div class="prose fn" style="font-size:15px;line-height:21px">'+
     '<h4>Responsable</h4><p>'+esc(CFG.owner)+' · '+esc(CFG.ownerEmail)+'</p>'+
-    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo. Si activas Comida, también tu peso y lo que apuntas que comes.</p>'+
+    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo. Si activas Comida, también tu peso, lo que apuntas que comes y tus platos y productos guardados.</p>'+
+    '<h4>Código de barras</h4><p>Al buscar un producto por su código, Tsuyo pregunta a Open Food Facts (base de datos abierta de alimentos) enviando solo ese número. Lo que encuentras se guarda en tu móvil.</p>'+
     '<h4>Para qué</h4><p>Solo para que registres y consultes tu progreso. No se usa para publicidad ni se cede a nadie.</p>'+
     '<h4>Dónde</h4><p>'+(CLOUD?'En Supabase, en servidores de la '+esc(CFG.region)+'. Cada persona solo accede a sus datos. Una copia queda en tu móvil.':'Esta versión de pruebas guarda los datos solo en este móvil.')+'</p>'+
     '<h4>Tus derechos</h4><p>Puedes descargar tus datos y eliminarlos desde Tú. Para cualquier otra petición escribe a '+esc(CFG.ownerEmail)+'. También puedes reclamar ante la AEPD (aepd.es).</p>'+
