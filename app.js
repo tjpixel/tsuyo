@@ -708,7 +708,7 @@ const GUIDES={
   inicio:{t:'Tu primer entreno',i:'play',h:'<p>El primer día no va de cuánto mueves, sino de <b>encontrar tu punto de partida</b> y aprender los movimientos.</p><ul><li><b>Busca tu peso.</b> La primera vez que haces un ejercicio, Tsuyo te deja tantear: haz 5 repeticiones tranquilas y elige <b>Fácil · subo</b> o <b>Pesado · bajo</b> hasta dar con un peso con el que llegarías a las repeticiones del rango dejando unas 3 en recámara. Ese será tu peso. Las pruebas no cuentan como series.</li><li><b>Si dudas, el más ligero.</b> Subir es fácil; recuperarse de un tirón, no.</li><li><b>Técnica primero.</b> Toca «Técnica» en cada ejercicio. Mejor un recorrido completo con poco peso que medio recorrido con mucho.</li><li><b>Descansa lo que marca el reloj.</b> Entre series, no apures.</li><li><b>Agujetas.</b> Es normal notarlas 1–3 días. No es una lesión.</li></ul><p>Las primeras 3 semanas son de aprendizaje: Tsuyo te propone pesos conservadores. <b>Si algo duele en una articulación, para.</b> Eso no es esfuerzo.</p>'},
   prog:{t:'Cómo progresar',i:'up',h:'<p>Cada ejercicio tiene un <b>rango</b> de repeticiones, por ejemplo 8–12.</p><ul><li>Cada sesión intentas <b>sumar repeticiones</b> con el mismo peso.</li><li>Cuando llegas al tope del rango <b>en todas las series</b>, subes peso.</li><li>Al subir, vuelves al extremo bajo del rango. Y otra vez.</li></ul><p>Tsuyo hace las cuentas: cuando toque subir, lo verás en Hoy con el peso propuesto.</p>'},
   descanso:{t:'Cuánto descansar',i:'clock',h:'<ul><li><b>Básicos pesados</b> (sentadilla, prensa, hip thrust…): 2,5–3 min.</li><li><b>Máquinas y mancuernas</b> de empuje y tirón: 2–2,5 min.</li><li><b>Aislados</b> (femoral, laterales, bíceps…): 1–1,5 min.</li><li><b>Core</b>: 60–90 s.</li><li><b>Después del cardio</b>: 1,5 min, para recuperar el aliento y cambiar de máquina.</li></ul><p>Con más descanso mantienes más carga. Si vas justo de tiempo, quita un ejercicio antes que recortar descansos.</p>'},
-  esfuerzo:{t:'Cuánto apretar',i:'bolt',h:'<p>Al anotar cada serie eliges cómo ha ido:</p><ul><li><b>Fácil</b>: te sobraban 3 repeticiones o más. Toca subir.</li><li><b>Bien</b>: te sobraban 1–2. Es tu sitio casi siempre.</li><li><b>Al límite</b>: no salía otra. Solo de vez en cuando, y nunca en los básicos pesados.</li></ul><p>Las primeras 3 semanas, quédate en Fácil o Bien mientras aprendes la técnica.</p>'},
+  esfuerzo:{t:'Cuánto apretar',i:'bolt',h:'<p>Al anotar cada serie eliges cómo ha ido:</p><ul><li><b>Fácil</b>: te sobraban 3 repeticiones o más. Toca subir.</li><li><b>Bien</b>: te sobraban 1–2. Es tu sitio casi siempre.</li><li><b>Al límite</b>: no salía otra. Solo de vez en cuando, y nunca en los básicos pesados.</li></ul><p>Las primeras 3 semanas, quédate en Fácil o Bien mientras aprendes la técnica.</p><p><b>En el cardio</b> se progresa en velocidad, no en minutos, y poco a poco. Tsuyo te trae la velocidad ya puesta según cómo lo marcaste la última vez:</p><ul><li><b>Suave</b>: hablabas sin esfuerzo. Sube 0,2&nbsp;km/h.</li><li><b>Bien</b>: frases completas. Es tu ritmo: la misma velocidad.</li><li><b>Duro</b>: palabras sueltas. Baja 0,5&nbsp;km/h.</li></ul><p>Si no completaste los minutos de la rutina, primero complétalos a la misma velocidad.</p>'},
   ciclo:{t:'El ciclo de 12 semanas',i:'cal',h:'<ul><li><b>Semanas 1–3</b>: aprendizaje. Pesos conservadores.</li><li><b>Semanas 4–8</b>: progresión. Subes casi cada semana.</li><li><b>Semanas 9–10</b>: se frena. Es normal.</li><li><b>Semana 11</b>: semana ligera. Mismos ejercicios, series y descansos con unos 2/3 del esfuerzo, para llegar descansado al bloque siguiente. En cada ejercicio Tsuyo baja una sola cosa y te pone la cifra: el peso al 65 %, la velocidad del cardio al 85 % y, en los de peso corporal o por tiempo, unos 2/3 de tus repeticiones o segundos. Esa semana no sube nada.</li><li><b>Semana 12</b>: revisión. Aquí sí cambias 1–2 ejercicios.</li></ul>'},
   seguridad:{t:'Seguridad',i:'shield',h:'<p>Si tienes una <b>lesión, dolor o una condición médica</b>, consulta antes con un profesional sanitario.</p><p><b>El dolor articular no es esfuerzo.</b> Si una serie molesta en una articulación, para, baja la carga o cambia el ejercicio.</p><p>Tsuyo no sustituye a un entrenador ni a un médico.</p>'}
 };
@@ -1191,9 +1191,10 @@ function renderSession(){
       h+='<div style="display:flex;flex-direction:column;align-items:center;margin-top:22px"><div class="ring" style="width:184px;height:184px"><svg width="184" height="184" viewBox="0 0 184 184" aria-hidden="true"><circle cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--fill2)" stroke-width="11"/>'+
         '<circle id="cArc" cx="92" cy="92" r="'+R+'" fill="none" stroke="var(--tint)" stroke-width="11" stroke-linecap="round" stroke-dasharray="'+C+'" stroke-dashoffset="'+C*(1-Math.min(1,el/tg))+'"/></svg>'+
         '<div class="in"><span class="rnd num bold" style="font-size:48px;line-height:54px" id="cT">'+mmss(el)+'</span><span class="fn l2 num" id="cL">'+cLab(el,tg)+'</span></div></div></div>'+
-        '<div class="stack" style="margin-top:20px;gap:12px">'+stepper('Objetivo',SS.mins,'min','ssMin',1)+stepper('Velocidad',SS.sp==null?'—':SS.sp,'km/h','ssSp',.5)+'</div>'+
+        /* el objetivo de minutos sale de la rutina (ajustes del ejercicio); aquí solo la velocidad, que es lo que progresa */
+        '<div class="stack" style="margin-top:20px;gap:12px">'+stepper('Velocidad',SS.sp==null?'—':fmtSp(SS.sp),'km/h','ssSp',SP_STEP)+'</div>'+
         '<div class="foot">'+(st==='idle'
-          ?'<button class="btn pri lg" onclick="cStart()">'+ic('play',20)+'Empezar</button><button class="btn tx" onclick="doneSet()">Anotar sin cronómetro</button>'
+          ?'<button class="btn pri lg" onclick="cStart()">'+ic('play',20)+'Empezar</button><button class="btn tx" onclick="openCardioLog()">Anotar sin cronómetro</button>'
           :'<button class="btn pri lg" onclick="'+(st==='run'?'cPause()':'cStart()')+'">'+(st==='run'?ic('pause',20)+'Pausa':ic('play',20)+'Seguir')+'</button><button class="btn tx" onclick="cFinish()">Terminar y anotar</button>')+'</div>';
     }else if(e.seg){
       const el=SS.wOn?Math.floor((Date.now()-SS.wStart)/1000):0,R=88,C=2*Math.PI*R;
@@ -1245,7 +1246,7 @@ function a11ySess(){
   else if(SS.ph==='set'){
     const e=curEx(),setN=e.side?Math.floor(SS.si/2)+1:SS.si+1,lo=e.lo,hi=e.hi,rng=lo===hi?String(hi):lo+' a '+hi;
     s='. Serie '+setN+' de '+e.s+(e.side?(SS.si%2?', lado derecho':', lado izquierdo'):'');
-    if(e.spd){s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';if(isLightWk()&&SS.sp)s+=', semana ligera, a '+fmtSp(SS.sp)+' kilómetros por hora'}
+    if(e.spd){s+='. Cardio, objetivo '+(SS.mins||hi)+' minutos';if(SS.sp)s+=(isLightWk()?', semana ligera':'')+', a '+fmtSp(SS.sp)+' kilómetros por hora'}
     else if(e.seg)s+=SS.wOn?'. Cronómetro en marcha':(lightGoal(e)?'. Semana ligera, aguanta unos '+lightGoal(e)+' segundos. Pulsa Empezar':'. Por tiempo, objetivo '+rng+' segundos. Pulsa Empezar');
     else{const lr=lightRepGoal(e),obj=lr?'semana ligera, unas '+lr+' repeticiones':(isLightWk()?'semana ligera, ':'')+'objetivo '+rng+' repeticiones';
       if(e.bw)s+='. Peso corporal, '+obj+(e.side?' por lado':'');
@@ -1294,12 +1295,27 @@ function stepper(lbl,val,unit,id,step){
   return '<div class="card row" style="padding:10px 10px 10px 18px"><span class="bd grow">'+lbl+'</span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\',-'+step+')" aria-label="Bajar '+lbl.toLowerCase()+'">'+ic('minus',16,2.4)+'</button>'+
     '<span class="t3 num" style="min-width:76px;text-align:center"><span id="'+id+'">'+val+'</span> <span class="fn l2">'+unit+'</span></span><button class="mini" style="background:var(--fill2)" onclick="adjV(\''+id+'\','+step+')" aria-label="Subir '+lbl.toLowerCase()+'">'+ic('plus',16,2.4)+'</button></div>';
 }
+/* − / + del cardio: velocidad de 0,1 en 0,1 como las cintas (sin velocidad anotada aún, el primer toque pone 6 km/h)
+   ssSp = pantalla del cardio · nsMin / nsSp = hoja de «Anotar sin cronómetro» */
+const spStep=(v,d)=>v==null?SP_START:Math.max(0.5,r1(v+d));
 function adjV(id,d){
-  if(id==='ssMin')SS.mins=Math.max(1,(SS.mins||0)+d);
-  if(id==='ssSp')SS.sp=Math.max(0,Math.round(((SS.sp||0)+d)*10)/10);
-  const el=$(id);if(el)el.textContent=id==='ssMin'?SS.mins:SS.sp;
-  say(id==='ssMin'?'Objetivo, '+SS.mins+(SS.mins===1?' minuto':' minutos'):'Velocidad, '+String(SS.sp).replace('.',',')+' kilómetros por hora');
+  if(id==='ssSp')SS.sp=spStep(SS.sp,d);
+  if(id==='nsSp'&&NS)NS.sp=spStep(NS.sp,d);
+  if(id==='nsMin'&&NS)NS.m=Math.max(1,NS.m+d);
+  const el=$(id),v=id==='ssSp'?SS.sp:(id==='nsSp'?NS&&NS.sp:NS&&NS.m);if(el)el.textContent=id==='nsMin'?v:fmtSp(v);
+  say(id==='nsMin'?v+(v===1?' minuto':' minutos'):'Velocidad, '+fmtSp(v)+' kilómetros por hora');
 }
+/* «Anotar sin cronómetro»: el cardio hecho sin el reloj de la app. Pregunta los minutos (empieza en el objetivo
+   de la rutina) y la velocidad (la de la pantalla); no se anota nada hasta «Anotar» */
+let NS=null;
+function openCardioLog(){
+  const e=curEx();NS={m:e.hi,sp:SS.sp};
+  openSheet(()=>({title:'¿Cuánto has hecho?',body:'<div class="pad stack" style="padding-bottom:calc(env(safe-area-inset-bottom) + 24px)">'+
+    '<p class="bd l2 center balance" style="padding:0 8px">Pon lo que has hecho en '+esc(exName(e.id)).toLowerCase()+'. Tu rutina pide <b class="num">'+e.hi+' min</b>.</p>'+
+    stepper('Minutos',NS.m,'min','nsMin',1)+stepper('Velocidad',NS.sp==null?'—':fmtSp(NS.sp),'km/h','nsSp',SP_STEP)+
+    '<button class="btn pri" style="margin-top:6px" onclick="okCardioLog()">Anotar</button></div>'}));
+}
+function okCardioLog(){if(!NS||!SS.on)return closeSheet();SS.mins=NS.m;SS.sp=NS.sp;NS=null;closeSheet();doneSet()}
 /* el campo de peso crece con la cifra para que «42,5» no pise los «kg» */
 let _cv;
 function fitW(el){

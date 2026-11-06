@@ -503,6 +503,24 @@ function lightSpeed(e,L){
   if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r&&x.sp||0));if(!mx)return null;
   return{mx,sp:Math.max(0.5,Math.round(mx*0.85*2)/2)};
 }
+/* ═════ VELOCIDAD DEL CARDIO ═════
+   Se progresa en velocidad, no en minutos, y en pasos pequeños. No manda el calendario sino cómo lo notaste
+   la última vez («¿Cómo ha ido?» del cardio: 4 Suave · 5 Bien · 7 Duro), igual que el peso solo sube al llegar al techo:
+   · Duro (palabras sueltas) → −0,5 km/h, para volver a poder hablar
+   · sin acabar los minutos de la rutina → la misma velocidad hasta completarlos
+   · Suave (hablas sin esfuerzo) con los minutos hechos → +0,2 km/h
+   · Bien (frases completas) o sin marcar → la misma velocidad
+   Se sube despacio y se baja con decisión. La cifra viene ya puesta en la pantalla, en Hoy y en VoiceOver.
+   En la pantalla, − / + van de 0,1 en 0,1 (como las cintas); sin velocidad anotada, el primer toque pone 6 km/h. */
+const SP_UP=0.2,SP_DOWN=0.5,SP_STEP=0.1,SP_START=6,r1=x=>Math.round(x*10)/10;
+function cardioNext(e,L){
+  const d=(L?L.sets:[]).filter(x=>x&&x.r&&x.sp);if(!d.length)return null;
+  const s=d.reduce((a,b)=>b.sp>a.sp?b:a),f=s.rir,base={v:s.sp,m:s.r};
+  if(f===7)return Object.assign(base,{k:'down',sp:Math.max(0.5,r1(s.sp-SP_DOWN))});
+  if(s.r<e.lo)return Object.assign(base,{k:'short',sp:s.sp});
+  if(f===4)return Object.assign(base,{k:'up',sp:r1(s.sp+SP_UP)});
+  return Object.assign(base,{k:f===5?'keep':'none',sp:s.sp});
+}
 function lightTime(e,L){
   if(!L)return null;const mx=Math.max(0,...L.sets.map(x=>x&&x.r||0));if(!mx)return null;
   const st=e.min?1:5,t=Math.max(st*(e.min?1:2),Math.round(mx*2/3/st)*st);
@@ -566,8 +584,14 @@ function advise(e){
   const TOP=t=>AL?BL+' llegaste al techo'+(t?': '+t:'')+'. ':'Techo alcanzado. ';
   if(e.spd){
     const sp=done.map(x=>x.sp).filter(x=>x);
-    if(!sp.length)return{txt:UVc+repsTxt(e,L.sets)+' min. Anota la velocidad para poder progresar.',up:false,w:''};
-    return{txt:UV+fmtSp(Math.max(...sp))+' km/h durante '+done[0].r+' min. <b>Sube la velocidad, no los minutos.</b>',up:false,w:''};
+    const cn=cardioNext(e,L);
+    if(!sp.length||!cn)return{txt:UVc+repsTxt(e,L.sets)+' min. Anota la velocidad para poder progresar.',up:false,w:''};
+    const b=UV+fmtSp(cn.v)+' km/h durante '+cn.m+' min',K='<b>'+fmtSp(cn.sp)+' km/h</b>',o={up:false,w:'',sp:cn.sp};
+    if(cn.k==='down')return Object.assign(o,{txt:b+', duro. Baja a '+K+': tiene que dejarte hablar con frases completas.'});
+    if(cn.k==='short')return Object.assign(o,{txt:b+'. Completa los '+e.lo+' min a '+K+' antes de subir.'});
+    if(cn.k==='up')return Object.assign(o,{txt:b+', suave. Sube a '+K+', mismos minutos.',up:true});
+    if(cn.k==='keep')return Object.assign(o,{txt:b+', bien. Repite '+K+': es tu ritmo. Cuando lo notes suave, subimos.'});
+    return Object.assign(o,{txt:b+'. Repite '+K+' y marca cómo ha ido: si lo notas suave, la próxima vez subimos.'});
   }
   if(e.bw){
     const un=e.min?'min':'s',pl=e.side?' por lado':'';
