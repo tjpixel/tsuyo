@@ -323,7 +323,12 @@ function sanitizeDB(r){
   out.supp={};if(isObj(r.supp))Object.entries(r.supp).forEach(([d,v])=>{if(!RX_DATE.test(d)||!isObj(v))return;out.supp[d]={};
     Object.entries(v).forEach(([id,on])=>{if(RX_ID.test(id)&&on)out.supp[d][id]=true})});
   out.diet={};if(isObj(r.diet))Object.entries(r.diet).forEach(([d,v])=>{if(!RX_DATE.test(d)||!isObj(v))return;
-    out.diet[d]={items:(Array.isArray(v.items)?v.items:[]).filter(isObj).slice(0,200).map(x=>({n:sStr(x.n,60)||'Alimento',k:sNum(x.k,0,10000)||0,p:sNum(x.p,0,1000)||0}))}});
+    out.diet[d]={items:(Array.isArray(v.items)?v.items:[]).filter(isObj).slice(0,200).map(x=>{
+      const o={n:sStr(x.n,60)||'Alimento',k:sNum(x.k,0,10000)||0,p:sNum(x.p,0,1000)||0};
+      // comida (desde tsuyo-v26): de dónde sale (c+código Ciqual o q = a ojo), gramos, hidratos, grasa y hora
+      if(typeof x.id==='string'&&/^(c\d{1,6}|q)$/.test(x.id))o.id=x.id;
+      [['g',0,5000],['c',0,1000],['f',0,1000]].forEach(([k,a,b])=>{const n=sNum(x[k],a,b);if(n!=null)o[k]=n});
+      if(/^([01]\d|2[0-3]):[0-5]\d$/.test(x.t||''))o.t=x.t;return o})}});
   // medidas cifradas: solo base64
   const E=r.bodyEnc;out.bodyEnc=null;
   if(isObj(E)&&RX_B64.test(E.salt||'')&&RX_B64.test(E.iv||'')&&RX_B64.test(E.ct||''))
@@ -341,6 +346,8 @@ function sanitizeDB(r){
     cel:Math.round(sNum(c.cel,0,999)||0)};                 // último bloque de 12 semanas ya celebrado
   // primer entreno: día y hora que eligió (para el aviso en Hoy y el calendario)
   if(isObj(c.first)&&RX_DATE.test(c.first.d)&&/^([01]\d|2[0-3]):[0-5]\d$/.test(c.first.t||''))out.cfg.first={d:c.first.d,t:c.first.t};
+  // comida: peso (kg) y gramos de proteína por kilo
+  if(isObj(c.food)){const kg=sNum(c.food.kg,30,300),gk=sNum(c.food.gk,1.2,2.2);if(kg)out.cfg.food={kg:Math.round(kg*10)/10,gk:gk?Math.round(gk*10)/10:1.6}}
   if(!out.cfg.avail.length)out.cfg.avail=f.avail.slice();
   return out;
 }

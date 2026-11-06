@@ -12,6 +12,7 @@ const IC={
   star:'<path fill="currentColor" stroke="none" d="M12 3.2l2.3 5.6 6 .5-4.6 3.9 1.4 5.9L12 15.9l-5.1 3.2 1.4-5.9-4.6-3.9 6-.5z"/>',
   book:'<path d="M4.5 5.5c2.5-.9 5-.6 7.5 1 2.5-1.6 5-1.9 7.5-1v13c-2.5-.9-5-.6-7.5 1-2.5-1.6-5-1.9-7.5-1z"/><path d="M12 6.5v13"/>',
   cal:'<rect x="4" y="5" width="16" height="15" rx="3.2"/><path d="M4 10h16M8.5 3v4M15.5 3v4"/>',
+  food:'<path d="M12 7.6c-1.6-1.3-5.6-1.6-6.7 2.2-1 3.6 1.3 9.4 4.2 9.9 1 .2 1.5-.4 2.5-.4s1.5.6 2.5.4c2.9-.5 5.2-6.3 4.2-9.9-1.1-3.8-5.1-3.5-6.7-2.2z"/><path d="M12 7.6c0-2 1-3.6 3.1-4.1"/>',
   heart:'<path d="M12 20s-7.6-4.6-7.6-10.3A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.6 2.4C19.6 15.4 12 20 12 20z"/>',
   trophy:'<path d="M8 4.5h8v4.2a4 4 0 0 1-8 0z"/><path d="M8 6.2H5.6a2.6 2.6 0 0 0 2.6 3.2M16 6.2h2.4a2.6 2.6 0 0 1-2.6 3.2"/><path d="M12 12.7v3.3M9 20h6M10 16h4v4h-4z"/>',
   pen:'<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/>',
@@ -131,7 +132,7 @@ function go(v){
 }
 function render(){
   {const nd=T();if(nd!==curDate){curDate=nd;buildPlan()}}applyLook();
-  if(cur==='hoy')renderHoy();if(cur==='progreso')renderProg();if(cur==='rutina')renderRut();
+  applyFoodTab();if(cur==='hoy')renderHoy();if(cur==='progreso')renderProg();if(cur==='rutina')renderRut();if(cur==='comida')renderComida();
   renderAcc();checkBlock();
   $('btnMe').innerHTML='<span class="deshi" data-pose="stand" data-crop="head" data-box="40" data-still></span>';
 }
@@ -219,6 +220,7 @@ function renderHoy(){
   }
   h+='</div>';
   h+=firstCard();
+  h+=foodHoyCard();
   // semana
   if(dayKeys().length){
     h+='<div class="sec"><div class="stitle"><h3 class="t3">Esta semana</h3><span class="fn l2">'+done+' de '+tot+' hechas</span></div>'+
@@ -635,7 +637,7 @@ function renderRut(){
       dayKeys().map(k=>'<button class="cell" onclick="openDaySheet('+k+')"><span class="exn">'+k+'</span><div class="cb"><div class="tt"><p class="hl">'+esc(PLAN[k].n)+'</p><p class="fn l2 ell">'+PLAN[k].ex.slice(0,3).map(e=>esc(e.n)).join(' · ')+(PLAN[k].ex.length>3?' · +'+(PLAN[k].ex.length-3):'')+'</p></div>'+chev()+'</div></button>').join('')+'</div></div></div>';
   }
   h+='<div class="sec"><div class="stitle"><h3 class="t3">Aprende</h3></div><div class="pad"><div class="group">'+
-    Object.keys(GUIDES).map(k=>'<button class="cell" onclick="openGuide(\''+k+'\')"><span class="ic gray">'+ic(GUIDES[k].i,17)+'</span><div class="cb"><span class="tt bd">'+GUIDES[k].t+'</span>'+chev()+'</div></button>').join('')+'</div></div></div>';
+    Object.keys(GUIDES).filter(k=>!GUIDES[k].diet||foodOn()).map(k=>'<button class="cell" onclick="openGuide(\''+k+'\')"><span class="ic gray">'+ic(GUIDES[k].i,17)+'</span><div class="cb"><span class="tt bd">'+GUIDES[k].t+'</span>'+chev()+'</div></button>').join('')+'</div></div></div>';
   $('v-rutina').innerHTML=h;
 }
 function openDaySheet(k){
@@ -710,6 +712,7 @@ const GUIDES={
   descanso:{t:'Cuánto descansar',i:'clock',h:'<ul><li><b>Básicos pesados</b> (sentadilla, prensa, hip thrust…): 2,5–3 min.</li><li><b>Máquinas y mancuernas</b> de empuje y tirón: 2–2,5 min.</li><li><b>Aislados</b> (femoral, laterales, bíceps…): 1–1,5 min.</li><li><b>Core</b>: 60–90 s.</li><li><b>Después del cardio</b>: 1,5 min, para recuperar el aliento y cambiar de máquina.</li></ul><p>Con más descanso mantienes más carga. Si vas justo de tiempo, quita un ejercicio antes que recortar descansos.</p>'},
   esfuerzo:{t:'Cuánto apretar',i:'bolt',h:'<p>Al anotar cada serie eliges cómo ha ido:</p><ul><li><b>Fácil</b>: te sobraban 3 repeticiones o más. Toca subir.</li><li><b>Bien</b>: te sobraban 1–2. Es tu sitio casi siempre.</li><li><b>Al límite</b>: no salía otra. Solo de vez en cuando, y nunca en los básicos pesados.</li></ul><p>Las primeras 3 semanas, quédate en Fácil o Bien mientras aprendes la técnica.</p><p><b>En el cardio</b> se progresa en velocidad, no en minutos, y poco a poco. Tsuyo te trae la velocidad ya puesta según cómo lo marcaste la última vez:</p><ul><li><b>Suave</b>: hablabas sin esfuerzo. Sube 0,2&nbsp;km/h.</li><li><b>Bien</b>: frases completas. Es tu ritmo: la misma velocidad.</li><li><b>Duro</b>: palabras sueltas. Baja 0,5&nbsp;km/h.</li></ul><p>Si no completaste los minutos de la rutina, primero complétalos a la misma velocidad.</p>'},
   ciclo:{t:'El ciclo de 12 semanas',i:'cal',h:'<ul><li><b>Semanas 1–3</b>: aprendizaje. Pesos conservadores.</li><li><b>Semanas 4–8</b>: progresión. Subes casi cada semana.</li><li><b>Semanas 9–10</b>: se frena. Es normal.</li><li><b>Semana 11</b>: semana ligera. Mismos ejercicios, series y descansos con unos 2/3 del esfuerzo, para llegar descansado al bloque siguiente. En cada ejercicio Tsuyo baja una sola cosa y te pone la cifra: el peso al 65 %, la velocidad del cardio al 85 % y, en los de peso corporal o por tiempo, unos 2/3 de tus repeticiones o segundos. Esa semana no sube nada.</li><li><b>Semana 12</b>: revisión. Aquí sí cambias 1–2 ejercicios.</li></ul>'},
+  proteina:{t:'Proteína: cuánta y por qué',i:'food',diet:1,h:'<p>Para ganar o mantener músculo entrenando, la cifra que más importa de la comida es la <b>proteína del día</b>.</p><ul><li><b>1,6 g por kilo al día.</b> En un metaanálisis de 49 estudios (Morton y otros, 2018), por encima de unos 1,6 g/kg ya no se ganó más músculo de media. Puedes subir hasta 2,2 si quieres margen.</li><li><b>Cuenta el total del día</b> y, sobre todo, la media de la semana. Un día por debajo no estropea nada.</li><li><b>Repartirla ayuda a llegar</b>: 3–4 comidas con 20–40 g cada una (ISSN, 2017). Una comida con mucha proteína no se desperdicia (Trommelen y otros, 2023).</li><li><b>El abdomen no se marca con más abdominales.</b> Seis semanas de abdominales mejoraron la resistencia, pero no quitaron grasa de la tripa (Vispute y otros, 2011). Lo marca bajar grasa; el entreno pone el músculo.</li></ul><p>Si tienes una enfermedad renal o tu médico te ha limitado la proteína, consulta antes. Tsuyo no sustituye a un dietista-nutricionista.</p><p class="fn l2">Los alimentos de la lista vienen de la tabla Ciqual 2025 (Anses) y las raciones de referencia, de la SENC.</p>'},
   seguridad:{t:'Seguridad',i:'shield',h:'<p>Si tienes una <b>lesión, dolor o una condición médica</b>, consulta antes con un profesional sanitario.</p><p><b>El dolor articular no es esfuerzo.</b> Si una serie molesta en una articulación, para, baja la carga o cambia el ejercicio.</p><p>Tsuyo no sustituye a un entrenador ni a un médico.</p>'}
 };
 function openGuide(k){openSheet(()=>({title:GUIDES[k].t,body:'<div class="prose">'+GUIDES[k].h+'</div>'}))}
@@ -791,6 +794,8 @@ function meSheet(){
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Deshi</p><div class="group">'+row('Aspecto','Piel, pelo y gi','openLook()')+row('Cinturón','Por constancia','openBeltSheet()')+'</div></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Entreno</p><div class="group">'+
       row('Días de entreno',av.map(d=>WDL[d]).join(', '),'openDays()')+row('Objetivo',p.goal?GOALS[p.goal].n:'—','openPickGoal()')+row('Experiencia',p.lvl?LEVELS[p.lvl].n:'—','openPickLvl()')+row('Zonas que cuidar',(p.care||[]).length?p.care.map(z=>ZONES[z]).join(', '):'Ninguna','openCare()')+'</div></div>'+
+    '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Módulos</p><div class="group">'+
+      '<button class="cell" onclick="openFoodSetup()"><span class="ic soft">'+ic('food',17)+'</span><div class="cb"><div class="tt"><p class="bd">Comida <span class="pill gray" style="margin-left:4px;vertical-align:2px">en pruebas</span></p><p class="fn l2">'+(foodOn()?'Activada'+(protGoal()?' · '+protGoal()+' g de proteína al día':''):'Proteína del día, gratis mientras se prueba')+'</p></div>'+chev()+'</div></button></div></div>'+
     '<div class="pad" style="margin-top:22px"><button class="group" style="display:block;width:100%" onclick="openPlus()"><div class="cell" style="min-height:64px"><span class="ic tint" style="width:34px;height:34px;border-radius:10px">'+ic('star',18)+'</span>'+
       '<div class="cb"><div class="tt"><p class="hl">'+(isPlus()?'Tsuyo Plus activo':'Prueba Tsuyo Plus')+'</p><p class="fn l2">'+(isPlus()?'Simulado en esta versión de pruebas':'7 días gratis · rutina a medida y más')+'</p></div>'+chev()+'</div></div></button></div>'+
     '<div class="pad" style="margin-top:22px"><p class="ghead" role="heading" aria-level="2" style="padding-left:16px">Apariencia</p><div class="segc" role="group" aria-label="Apariencia">'+
@@ -834,7 +839,7 @@ function downloadData(){
 function openPrivacy(){
   openSheet(()=>({title:'Privacidad',body:'<div class="prose fn" style="font-size:15px;line-height:21px">'+
     '<h4>Responsable</h4><p>'+esc(CFG.owner)+' · '+esc(CFG.ownerEmail)+'</p>'+
-    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo.</p>'+
+    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo. Si activas Comida, también tu peso y lo que apuntas que comes.</p>'+
     '<h4>Para qué</h4><p>Solo para que registres y consultes tu progreso. No se usa para publicidad ni se cede a nadie.</p>'+
     '<h4>Dónde</h4><p>'+(CLOUD?'En Supabase, en servidores de la '+esc(CFG.region)+'. Cada persona solo accede a sus datos. Una copia queda en tu móvil.':'Esta versión de pruebas guarda los datos solo en este móvil.')+'</p>'+
     '<h4>Tus derechos</h4><p>Puedes descargar tus datos y eliminarlos desde Tú. Para cualquier otra petición escribe a '+esc(CFG.ownerEmail)+'. También puedes reclamar ante la AEPD (aepd.es).</p>'+
@@ -946,7 +951,7 @@ let PLUSP='y';
 function openPlus(){
   openSheet(()=>({title:'',body:'<div style="display:flex;flex-direction:column;align-items:center;padding:0 20px">'+dkStage('suburi',2)+
     '<div class="row" style="gap:8px;margin-top:14px"><span class="brand" style="font-size:22px">Tsuyo</span><span class="pill plus">PLUS</span></div><h2 class="t1 center" style="margin-top:6px">Entrena a tu medida</h2></div>'+
-    '<div class="stack" style="padding:18px 28px 0;gap:14px">'+[['pen','Rutina a medida','Cambia días, series, descansos y ejercicios.'],['cal','Ciclo de 12 semanas','Semana ligera con las cifras ya calculadas.'],['chart','Progreso completo','Gráfica por ejercicio e historial sin límite.'],['heart','Nutrición y medidas','Llegarán en las próximas versiones.']].map(([i,t,s])=>
+    '<div class="stack" style="padding:18px 28px 0;gap:14px">'+[['pen','Rutina a medida','Cambia días, series, descansos y ejercicios.'],['cal','Ciclo de 12 semanas','Semana ligera con las cifras ya calculadas.'],['chart','Progreso completo','Gráfica por ejercicio e historial sin límite.'],['heart','Medidas corporales','Llegarán en las próximas versiones.']].map(([i,t,s])=>
       '<div class="row" style="gap:13px;align-items:flex-start"><span class="ic soft" style="width:32px;height:32px;border-radius:9px;display:grid;place-items:center">'+ic(i,17)+'</span><div><p class="hl">'+t+'</p><p class="fn l2">'+s+'</p></div></div>').join('')+'</div>'+
     (isPlus()?'<div class="pad stack" style="margin-top:22px"><div class="note"><span>Plus está activo en modo de pruebas. No se ha cobrado nada.</span></div><button class="btn sec danger" onclick="PREF.set(\'plus\',false);closeSheet();render();toast(\'Plus desactivado\')">Desactivar Plus</button></div>'
     :'<div class="pad stack" style="margin-top:22px;gap:8px">'+

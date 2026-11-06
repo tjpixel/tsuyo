@@ -173,6 +173,19 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .tabbar{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 14px);transform:translateX(-50%);height:64px;padding:4px;border-radius:32px;display:flex;gap:2px;z-index:30}
 .tab{width:100px;height:56px;border-radius:28px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;color:var(--label);font-size:10px;line-height:12px;font-weight:600;letter-spacing:.1px}
 .tab.on{color:var(--ink);background:var(--fill2)}
+.tab[hidden]{display:none}
+.tabbar.four .tab{width:84px}
+/* ── comida ── */
+.fday{display:flex;align-items:center;gap:6px}
+.fday .ibtn:disabled{opacity:.3}
+.frow{padding-left:16px}
+.frow .cb{background:none;border-radius:0}
+.fadd{align-self:center;margin-right:8px;width:40px;height:40px;background:var(--tint-soft);color:var(--ink)}
+.famt{width:140px;border:0;font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;background:none;text-align:center;font-size:56px;line-height:64px;font-weight:700;letter-spacing:-1px;color:var(--label);outline:none;padding:0}
+.famt:focus{box-shadow:inset 0 -2px 0 var(--ink)}
+.fchips{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:14px}
+.fchips button{height:36px;padding:0 14px;border-radius:18px;background:var(--fill2);font-size:14px;font-weight:600;color:var(--label)}
+.fchips button.on{background:var(--tint-soft);color:var(--ink);box-shadow:inset 0 0 0 1.5px var(--ink)}
 .accessory{position:fixed;left:50%;transform:translateX(-50%);width:min(400px,calc(100% - 32px));bottom:calc(env(safe-area-inset-bottom) + 88px);height:58px;border-radius:29px;display:flex;align-items:center;gap:11px;padding:0 8px 0 9px;z-index:30;text-align:left}
 
 /* ── semana ── */
@@ -365,6 +378,7 @@ body.locked{position:fixed;left:0;right:0;overflow:hidden}
   <button class="topbtn topbar-right avatar glass" id="btnMe" onclick="openMe()" aria-label="Tú: perfil y ajustes" hidden></button>
   <main>
     <section class="view" id="v-hoy" aria-label="Hoy"></section>
+    <section class="view" id="v-comida" aria-label="Comida"></section>
     <section class="view" id="v-progreso" aria-label="Progreso"></section>
     <section class="view" id="v-rutina" aria-label="Rutina"></section>
   </main>
@@ -372,6 +386,8 @@ body.locked{position:fixed;left:0;right:0;overflow:hidden}
   <nav class="tabbar glass" id="tabbar" aria-label="Secciones" hidden>
     <button class="tab" data-v="hoy" onclick="go('hoy')">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="6.5" width="3.2" height="11" rx="1.3"/><rect x="15.8" y="6.5" width="3.2" height="11" rx="1.3"/><path d="M2.6 10v4M21.4 10v4M8.2 12h7.6"/></svg>Hoy</button>
+    <button class="tab" data-v="comida" onclick="go('comida')" hidden>
+      <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7.6c-1.6-1.3-5.6-1.6-6.7 2.2-1 3.6 1.3 9.4 4.2 9.9 1 .2 1.5-.4 2.5-.4s1.5.6 2.5.4c2.9-.5 5.2-6.3 4.2-9.9-1.1-3.8-5.1-3.5-6.7-2.2z"/><path d="M12 7.6c0-2 1-3.6 3.1-4.1"/></svg>Comida</button>
     <button class="tab" data-v="progreso" onclick="go('progreso')">
       <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19.5h16"/><path d="M5 15.5l4.5-4.5 3.2 3.2L19 8"/><path d="M14.8 8H19v4.2"/></svg>Progreso</button>
     <button class="tab" data-v="rutina" onclick="go('rutina')">
@@ -394,6 +410,8 @@ body.locked{position:fixed;left:0;right:0;overflow:hidden}
 
 <script src="core.js"></script>
 <script src="data.js"></script>
+<script src="foods.js"></script>
+<script src="comida.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
