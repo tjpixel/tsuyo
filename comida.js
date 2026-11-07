@@ -303,15 +303,17 @@ function mineAmtSheet(){
     '<div class="row" style="justify-content:center;gap:18px;padding:6px 0 2px">'+
       '<button class="step" onclick="mineAmtAdj(-1)" aria-label="Bajar a '+mAmt(m,Math.max(0.5,FM.r-0.5),1)+'"'+(FM.r<=0.5?' disabled':'')+'>'+ic('minus',24,2.6)+'</button>'+
       '<div class="center" style="min-width:140px"><p class="famt num" aria-hidden="true">'+A.slice(0,sp)+'</p><p class="fn l2" aria-hidden="true">'+A.slice(sp+1)+'</p></div>'+
-      '<button class="step" onclick="mineAmtAdj(1)" aria-label="Subir a '+mAmt(m,Math.min(10,FM.r+0.5),1)+'"'+(FM.r>=10?' disabled':'')+'>'+ic('plus',24,2.6)+'</button></div>'+
-    '<div class="fchips" role="group" aria-label="Cantidad">'+[0.5,1,1.5,2].map(n=>'<button class="'+(FM.r===n?'on':'')+'" onclick="FM.r='+n+';drawSheet()" aria-pressed="'+(FM.r===n)+'" aria-label="'+mAmt(m,n,1)+'">'+mAmt(m,n).replace(/ \(.*\)$/,'')+'</button>').join('')+'</div>'+
+      '<button class="step" onclick="mineAmtAdj(1)" aria-label="Subir a '+mAmt(m,Math.min(rMax(m),FM.r+0.5),1)+'"'+(FM.r>=rMax(m)?' disabled':'')+'>'+ic('plus',24,2.6)+'</button></div>'+
+    '<div class="fchips" role="group" aria-label="Cantidad">'+[0.5,1,1.5,2].filter(n=>n<=rMax(m)).map(n=>'<button class="'+(FM.r===n?'on':'')+'" onclick="FM.r='+n+';drawSheet()" aria-pressed="'+(FM.r===n)+'" aria-label="'+mAmt(m,n,1)+'">'+mAmt(m,n).replace(/ \(.*\)$/,'')+'</button>').join('')+'</div>'+
     '<div class="card center" style="margin-top:16px;padding:14px" aria-live="polite"><p class="fn l2">Proteína</p><p class="t1 num">'+gTxt(x.p)+'</p></div>'+
     '<div class="stack" style="margin-top:18px"><button class="btn pri" onclick="mineAmtOk()">'+(edit?'Guardar':'Añadir')+'</button>'+
     (edit?'<button class="btn sec danger" onclick="askFoodDel('+FM.idx+')">Quitar</button>':'')+
     '<button class="btn tx" onclick="openMineEdit(\''+FM.id+'\')">Editar «'+esc(m.n)+'»</button></div>'+
     (m.src==='off'?'<p class="c1 l3" style="padding:12px 6px 0">Datos de Open Food Facts, revisados por ti al guardarlo.</p>':'')+'</div>'};
 }
-function mineAmtAdj(d){FM.r=Math.max(0.5,Math.min(10,FM.r+d*0.5));drawSheet();const m=DB.mine[FM.id];say(mAmt(m,FM.r,1)+', '+gTxt(mineAt(FM.id,FM.r).p).replace(' g',' gramos')+' de proteína')}
+/* como mucho 4 veces y no más de 200 g de proteína de golpe */
+const rMax=m=>Math.max(0.5,Math.min(4,Math.floor(400/Math.max(m.p,1))/2));
+function mineAmtAdj(d){FM.r=Math.max(0.5,Math.min(rMax(DB.mine[FM.id]),FM.r+d*0.5));drawSheet();const m=DB.mine[FM.id];say(mAmt(m,FM.r,1)+', '+gTxt(mineAt(FM.id,FM.r).p).replace(' g',' gramos')+' de proteína')}
 function mineAmtOk(){
   const x=mineAt(FM.id,FM.r);
   if(FM.idx!=null){const L=dayItems(fdDay()),o=L[FM.idx];if(!o)return closeSheet();x.t=o.t||'';L[FM.idx]=x;save();closeSheet();render();toast('Guardado');say('Guardado: '+x.n+', '+mAmt(DB.mine[FM.id],FM.r,1));return}
@@ -356,17 +358,31 @@ function openProd(id,pre){
   openSheet(prodSheet,$('sheet').classList.contains('on'),!!pre);
 }
 const lblN=()=>LBL_UI.filter(([k])=>String(PF.L[k]||'').trim()).length;
+/* topes de lo posible: más allá, casi seguro es un error de tecleo o de unidad */
+const LIM={t:{g:2000,ml:2000,u:20},q:{g:1000,ml:1000,u:20},pToma:150,kcal100:900};
+const limTxt={g:'2 kg',ml:'2 litros',u:'20 unidades'};
 /* lee el formulario: {L, t} o {err, el} */
 function prodRead(){
   const p=pNum(PF.L.p),q=pNum(PF.q),t=pNum(PF.t),U=PF.u;
   if(p==null)return{err:'Falta la proteína de la etiqueta',el:'pfP'};
   if(isNaN(p)||p<0||p>5000)return{err:'Revisa la proteína',el:'pfP'};
-  if(q==null||isNaN(q)||q<=0||q>5000)return{err:'Revisa la cantidad de la etiqueta',el:'pfQ'};
+  if(q==null||isNaN(q)||q<=0)return{err:'Revisa la cantidad de la etiqueta',el:'pfQ'};
+  if(q>LIM.q[U])return{err:U==='u'?'La etiqueta no da los valores por '+nStr(q)+' unidades: revisa la cantidad':'Las etiquetas dan los valores por 100 '+U+' o por toma: revisa la cantidad',el:'pfQ'};
   if(U!=='u'&&p>q)return{err:'La proteína no puede pasar de '+nStr(q)+' '+U+': revisa las cifras',el:'pfP'};
   const L={q:r1v(q),u:U,p:r1v(p)};
   for(const [k,name] of LBL_UI){const n=pNum(PF.L[k]);if(n==null)continue;if(isNaN(n)||n<0)return{err:'Revisa «'+name.replace(/^de l[oa]s cuales /,'')+'»',el:'pf_'+k};L[k]=k==='k'?Math.round(n):r1v(n)}
+  if(U!=='u'){
+    const sum=['p','f','c','fi','sal'].reduce((a,k)=>a+(L[k]||0),0);
+    if(sum>q*1.05)return{err:'Proteína, grasas, hidratos, fibra y sal suman más de '+nStr(q)+' '+U+': revisa la etiqueta',el:'pf_f'};
+    if(L.k!=null&&L.k>q*LIM.kcal100/100)return{err:'Más de '+Math.round(q*LIM.kcal100/100)+' kcal en '+nStr(q)+' '+U+' no es posible: revisa la energía',el:'pf_k'};
+  }
+  if(L.fs!=null&&L.f!=null&&L.fs>L.f)return{err:'Las saturadas no pueden pasar de las grasas',el:'pf_fs'};
+  if(L.s!=null&&L.c!=null&&L.s>L.c)return{err:'Los azúcares no pueden pasar de los hidratos',el:'pf_s'};
   if(t==null)return{err:'Falta lo que te tomas',el:'pfT'};
-  if(isNaN(t)||t<=0||t>5000)return{err:'Revisa lo que te tomas',el:'pfT'};
+  if(isNaN(t)||t<=0)return{err:'Revisa lo que te tomas',el:'pfT'};
+  if(t>LIM.t[U])return{err:'Más de '+limTxt[U]+' de una vez no parece real: revisa lo que te tomas',el:'pfT'};
+  const pt=L.p*t/L.q;
+  if(pt>LIM.pToma)return{err:'Saldrían '+Math.round(pt)+' g de proteína de una vez, y eso no es posible: revisa las cifras'+(U==='u'?' (¿la etiqueta va por unidad?)':''),el:'pfT'};
   return{L,t:r1v(t)};
 }
 function prodRes(){
@@ -405,7 +421,18 @@ function prodSheet(){
 }
 /* la etiqueta leída en una frase, para confirmar que se ha entendido bien */
 function prodSay(){const p=pNum(PF.L.p),q=pNum(PF.q);if(p==null||isNaN(p)||!q)return 'Copia la proteína y la cantidad tal como vienen en la etiqueta.';return nStr(r1v(p))+' g de proteína por cada '+(PF.u==='u'&&q===1?'unidad':nStr(r1v(q))+' '+uWord(PF.u,q))}
-function prodUnit(u){if(PF.u===u)return;const was=PF.u;PF.u=u;if(u==='u'&&(PF.q==='100'||!PF.q))PF.q='1';else if(was==='u'&&PF.q==='1')PF.q='100';drawSheet();say('Unidad: '+uWord(u,2,U_SAY)+'. '+prodSay())}
+/* g ↔ ml: mismas cifras. A unidad o desde unidad, las cifras ya no valen (40 g por 100 g no son 40 g por unidad):
+   se guardan las de antes, se vacía la etiqueta y lo que te tomas, y al volver se recuperan */
+function prodUnit(u){
+  if(PF.u===u)return;const was=PF.u,kind=x=>x==='u'?'u':'m';
+  if(kind(was)===kind(u)){PF.u=u;drawSheet();say('Unidad: '+uWord(u,2,U_SAY)+'. '+prodSay());return}
+  PF.bk=PF.bk||{};PF.bk[kind(was)]={q:PF.q,L:Object.assign({},PF.L),t:PF.t};
+  const b=PF.bk[kind(u)];PF.u=u;
+  if(b){PF.q=b.q;PF.L=Object.assign({},b.L);PF.t=b.t}else{PF.q=u==='u'?'1':'100';PF.L={p:''};PF.t=''}
+  drawSheet();
+  const msg=b?'Recuperadas las cifras por '+uWord(u,2):'Pon las cifras de la etiqueta por '+(u==='u'?'unidad':'100 '+u);
+  toast(msg);say('Unidad: '+uWord(u,2,U_SAY)+'. '+msg);
+}
 function prodLive(){
   $('pfRes').innerHTML=prodRes();$('pfSay').textContent=prodSay();$('pfTu').textContent=uWord(PF.u,pNum(PF.t)||2);
   $('pfOk').disabled=!!(prodRead().err||!sStr(PF.n,60));
@@ -501,7 +528,7 @@ async function offLookup(code){
   if(!P)return offMsg('No está en Open Food Facts','El código '+code+' no aparece. Créalo a mano con la etiqueta y la próxima vez ya lo tendrás.',offManual(code));
   PF=offToPF(P,code);openProd(null,PF);
 }
-const V_APP='29';
+const V_APP='30';
 function offToPF(P,code){
   const N=P.nutriments||{},num=k=>{const n=parseFloat(N[k]);return isFinite(n)&&n>=0?r1v(n):null};
   const q=String(P.quantity||'')+' '+String(P.serving_size||''),ml=/\d\s*(ml|cl|l)\b/i.test(q)&&!/\d\s*g\b/i.test(String(P.serving_size||''));
