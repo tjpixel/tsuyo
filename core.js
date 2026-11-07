@@ -252,6 +252,18 @@ function unskipToday(){
 function freshDB(){return{v:2,_ts:0,profile:{},plan:null,cex:{},inc:{},wu:{},sess:{},skips:{},supp:{},diet:{},mine:{},bodyEnc:null,cfg:{
   start:'',k:2000,p:120,f:65,c:220,avail:[1,3,5],force:null,mods:{diet:false,body:false},supps:[]
 }}}
+/* etiqueta de un producto de Mis platos (tsuyo-v29): L = {q, u, p, k, f, fs, c, s, fi, sal} = lo que dice la etiqueta para q gramos, ml o unidades (u = 'g' | 'ml' | 'u');
+   t = lo que te tomas cada vez, en la misma unidad. Orden de la etiqueta europea: energía, grasas, saturadas, hidratos, azúcares, fibra, proteínas, sal. */
+const LBL=[['k',20000],['f',5000],['fs',5000],['c',5000],['s',5000],['fi',5000],['sal',500]];
+const r1v=n=>Math.round(n*10)/10;
+/* calcula lo de cada toma (p, k, c, f, g, u) a partir de la etiqueta; es lo que se apunta */
+function mineCalc(o){
+  const L=o.L,x=o.t/L.q;o.p=r1v(L.p*x);o.k=Math.round((L.k||0)*x);
+  delete o.c;delete o.f;delete o.g;delete o.u;
+  if(L.c!=null)o.c=r1v(L.c*x);if(L.f!=null)o.f=r1v(L.f*x);
+  if(L.u==='u')o.u='u';else{o.g=Math.round(o.t);if(L.u==='ml')o.u='ml'}
+  return o;
+}
 function mergeDefaults(o){
   const d=freshDB();o=o||{};
   const r=Object.assign(d,o);
@@ -330,15 +342,24 @@ function sanitizeDB(r){
       if(typeof x.id==='string'&&/^(c\d{1,6}|q|m[0-9a-z]{1,12})$/.test(x.id))o.id=x.id;
       [['g',0,5000],['c',0,1000],['f',0,1000],['r',0.25,20]].forEach(([k,a,b])=>{const n=sNum(x[k],a,b);if(n!=null)o[k]=n});
       if(/^([01]\d|2[0-3]):[0-5]\d$/.test(x.t||''))o.t=x.t;return o})}});
-  // mis platos y productos (desde tsuyo-v28): valores por ración; p100… si vienen de una etiqueta por 100 g; parts = alimentos de la lista
+  // mis platos y productos: los productos guardan su etiqueta (L) y lo que te tomas (t) desde tsuyo-v29; los platos, sus alimentos (parts)
   out.mine={};if(isObj(r.mine))Object.entries(r.mine).slice(0,150).forEach(([id,m])=>{
     if(!/^m[0-9a-z]{1,12}$/.test(id)||!isObj(m))return;
-    const o={n:sStr(m.n,60)||'Mi plato',p:sNum(m.p,0,500)||0,k:Math.round(sNum(m.k,0,10000)||0)};
-    [['c',0,1000],['f',0,1000],['g',1,5000],['p100',0,100],['k100',0,1000],['c100',0,100],['f100',0,100]].forEach(([k,a,b])=>{const n=sNum(m[k],a,b);if(n!=null)o[k]=Math.round(n*10)/10});
-    if(m.u==='ml')o.u='ml';if(typeof m.code==='string'&&/^\d{8,14}$/.test(m.code))o.code=m.code;if(m.src==='off')o.src='off';
-    if(m.b)o.b=sStr(m.b,40);
-    if(Array.isArray(m.parts)){const P=m.parts.filter(q=>Array.isArray(q)&&/^c\d{1,6}$/.test(q[0])&&sNum(q[1],1,2000)).slice(0,20).map(q=>[q[0],Math.round(sNum(q[1],1,2000))]);if(P.length)o.parts=P}
-    o.ts=Math.round(sNum(m.ts,0,9e15)||0);out.mine[id]=o;
+    let o={n:sStr(m.n,60)||'Mi plato'};
+    if(typeof m.code==='string'&&/^\d{8,14}$/.test(m.code))o.code=m.code;if(m.src==='off')o.src='off';if(m.b)o.b=sStr(m.b,40);
+    o.ts=Math.round(sNum(m.ts,0,9e15)||0);
+    const P=Array.isArray(m.parts)?m.parts.filter(q=>Array.isArray(q)&&/^c\d{1,6}$/.test(q[0])&&sNum(q[1],1,2000)).slice(0,20).map(q=>[q[0],Math.round(sNum(q[1],1,2000))]):[];
+    if(P.length){o.parts=P;o.p=sNum(m.p,0,500)||0;o.k=Math.round(sNum(m.k,0,10000)||0);
+      [['c',0,1000],['f',0,1000],['g',1,5000]].forEach(([k,a,b])=>{const n=sNum(m[k],a,b);if(n!=null)o[k]=Math.round(n*10)/10});out.mine[id]=o;return}
+    let L=null,t=null;
+    if(isObj(m.L)){const q=sNum(m.L.q,0.1,5000),lp=sNum(m.L.p,0,5000);
+      if(q&&lp!=null){L={q:r1v(q),u:['g','ml','u'].includes(m.L.u)?m.L.u:'g',p:r1v(lp)};LBL.forEach(([k,mx])=>{const n=sNum(m.L[k],0,mx);if(n!=null)L[k]=r1v(n)})}
+      t=sNum(m.t,0.1,5000)}
+    // de tsuyo-v28: etiqueta por 100 g, o proteína por ración (con o sin su tamaño)
+    if(!L){const u=m.u==='ml'?'ml':'g',g=sNum(m.g,1,5000);
+      if(sNum(m.p100,0,100)!=null){L={q:100,u,p:r1v(m.p100)};[['k','k100'],['c','c100'],['f','f100']].forEach(([k,o2])=>{const n=sNum(m[o2],0,1000);if(n!=null)L[k]=r1v(n)});t=g||100}
+      else{const p=sNum(m.p,0,500)||0,k=sNum(m.k,0,10000);L=g?{q:g,u,p:r1v(p)}:{q:1,u:'u',p:r1v(p)};if(k)L.k=Math.round(k);t=g||1}}
+    o.L=L;o.t=t||L.q;out.mine[id]=mineCalc(o);
   });
   // medidas cifradas: solo base64
   const E=r.bodyEnc;out.bodyEnc=null;

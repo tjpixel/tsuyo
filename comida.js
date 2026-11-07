@@ -89,7 +89,7 @@ function renderComida(){
   h+='</div>';
   if(items.length){
     h+='<div class="sec"><div class="stitle"><h3 class="t3">'+(d===T()?'Hoy':foodDayTxt(d))+'</h3><span class="fn l2 num">'+gTxt(p)+' de proteína</span></div><div class="pad"><div class="group">'+
-      items.map(x=>'<button class="cell" onclick="openFoodItem('+x.i+')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(x.n)+'</p><p class="fn l2 num">'+(x.id==='q'?'A ojo':(x.id&&x.id[0]==='m'?rTxt(x.r||1)+(x.g?' ('+x.g+' '+((DB.mine[x.id]||{}).u||'g')+')':''):(x.g?x.g+' g':'Importado')))+' · '+gTxt(x.p||0)+' de proteína</p></div><span class="fn l2 num">'+esc(x.t||'')+'</span>'+chev()+'</div></button>').join('')+'</div></div></div>';
+      items.map(x=>'<button class="cell" onclick="openFoodItem('+x.i+')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(x.n)+'</p><p class="fn l2 num">'+(x.id==='q'?'A ojo':(x.id&&x.id[0]==='m'?itemAmt(x):(x.g?x.g+' g':'Importado')))+' · '+gTxt(x.p||0)+' de proteína</p></div><span class="fn l2 num">'+esc(x.t||'')+'</span>'+chev()+'</div></button>').join('')+'</div></div></div>';
   }
   if(goal){
     const W=foodWeek(d),Wn=W.filter(x=>x.n),avg=Wn.length?Wn.reduce((a,x)=>a+x.p,0)/Wn.length:0,cur=mondayOf(d)===mondayOf(T());
@@ -247,7 +247,7 @@ function foodQSheet(){
 }
 function foodQOk(){
   if(FQP.keep&&FQP.idx==null){const n=sStr(FQP.n,60);if(!n){toast('Pon qué era para guardarlo');a11yFocus($('fQn'));return}
-    const id=mineNewId();DB.mine[id]={n,p:FQP.p,k:0,ts:Date.now()};const x=mineAt(id,1);foodPush(x);foodAdded(x);toast('Guardado en Mis platos y añadido');return}
+    const id=mineNewId();DB.mine[id]=mineCalc({n,L:{q:1,u:'u',p:FQP.p},t:1,ts:Date.now()});const x=mineAt(id,1);foodPush(x);foodAdded(x);toast('Guardado en Mis platos y añadido');return}
   const x={n:sStr(FQP.n,60)||'A ojo',id:'q',p:FQP.p,k:0};
   if(FQP.idx!=null){const L=dayItems(fdDay()),o=L[FQP.idx];if(!o)return closeSheet();x.t=o.t||'';L[FQP.idx]=x;save();closeSheet();render();toast('Guardado');return}
   foodPush(x);foodAdded(x);
@@ -265,44 +265,56 @@ function openFoodItem(i){
 function askFoodDel(i){const o=dayItems(fdDay())[i];if(!o)return;confirmSheet('Quitar','Se quita «'+esc(o.n)+'» de '+foodDayTxt(fdDay()).toLowerCase()+'. No se puede deshacer.','Quitar','foodDel('+i+')',true)}
 function foodDel(i){const L=dayItems(fdDay());const o=L[i];if(!o)return closeSheet();L.splice(i,1);save();closeSheet();render();toast('Quitado');say('Quitado: '+o.n+'. '+protSay(sumP(fdDay()),protGoal()))}
 
-/* ═════ MIS PLATOS Y PRODUCTOS (parte 2, tsuyo-v28) ═════
-   Cada uno guarda sus valores por ración: un producto (Plenny, batido…) o un plato con varios alimentos de la lista.
-   Se apunta por raciones (½, 1, 1½…) y sale en Habituales con su «+» de un toque. Lo ya apuntado no cambia si luego se edita o se borra. */
+/* ═════ MIS PLATOS Y PRODUCTOS (parte 2, tsuyo-v28; etiqueta completa desde tsuyo-v29) ═════
+   Un producto guarda su etiqueta tal cual y lo que te tomas cada vez (ver mineCalc en core.js); un plato, sus alimentos de la lista.
+   Se apunta por veces (½, 1, 1½…), enseñando la cantidad («400 ml», «2 unidades», «1 plato»), nunca «raciones».
+   Sale en Habituales con su «+». Lo ya apuntado no cambia si luego se edita o se borra. */
 const mineIds=()=>Object.keys(DB.mine||{}).sort((a,b)=>DB.mine[a].n.localeCompare(DB.mine[b].n,'es'));
 const mineNewId=()=>{let id;do{id='m'+Date.now().toString(36)+Math.floor(Math.random()*36).toString(36)}while(DB.mine[id]);return id};
-function rTxt(r){const w=Math.floor(r),h=r-w>=0.5?'½':'',t=(w||!h?w||'':'')+h;return (t||'0')+(r===1||r===0.5?' ración':' raciones')}
-const rSay=r=>(r===0.5?'media ración':(Math.floor(r)+(r%1?' y media':'')+(r===1?' ración':' raciones')));
+/* 1,5 → «1½»; 0,5 → «½»; 0,75 → «0,75» */
+function qTxt(n){n=Math.round(n*100)/100;const w=Math.floor(n),f=Math.round((n-w)*100)/100;return f===0.5?(w||'')+'½':String(n).replace('.',',')}
+const qSay=n=>{n=Math.round(n*100)/100;const w=Math.floor(n),f=Math.round((n-w)*100)/100;return f===0.5?(w?w+' y media':'media'):String(n).replace('.',',')};
+const U_TXT={g:['g','g'],ml:['ml','ml'],u:['unidad','unidades']},U_SAY={g:['gramo','gramos'],ml:['mililitro','mililitros'],u:['unidad','unidades']};
+const uWord=(u,n,W)=>(W||U_TXT)[u][n<=1?0:1];
+/* cantidad de r veces: «400 ml», «2 unidades», «1 plato (218 g)» */
+function mAmt(m,r,say){
+  if(m.parts){const g=Math.round((m.g||0)*r),w=say?(r===0.5?'medio plato':qSay(r)+(r<=1?' plato':' platos')):qTxt(r)+(r<=1?' plato':' platos');return w+(g?(say?', '+g+' gramos':' ('+g+' g)'):'')}
+  const u=m.u==='u'?'u':(m.u==='ml'?'ml':'g'),n=u==='u'?(m.t||1)*r:Math.round((m.g||0)*r);
+  return say?(u==='u'?qSay(n):n)+' '+uWord(u,n,U_SAY):(u==='u'?qTxt(n):n)+' '+uWord(u,n);
+}
 function mineAt(id,r){const m=DB.mine[id],x={n:m.n,id,r,p:fr1(m.p*r),k:Math.round((m.k||0)*r)};if(m.c!=null)x.c=fr1(m.c*r);if(m.f!=null)x.f=fr1(m.f*r);if(m.g)x.g=Math.round(m.g*r);return x}
-function mineSub(id,r){const m=DB.mine[id],x=mineAt(id,r);return rTxt(r)+(m.g?' ('+x.g+' '+(m.u||'g')+')':'')+' · '+gTxt(x.p)+' de proteína'}
+function mineSub(id,r){const m=DB.mine[id];return mAmt(m,r)+' · '+gTxt(mineAt(id,r).p)+' de proteína'}
+/* lo apuntado, en la lista del día: con la cantidad que se apuntó */
+function itemAmt(x){const m=DB.mine[x.id];if(m&&!m.parts&&m.u!=='u'&&x.g)return x.g+' '+(m.u||'g');if(m)return mAmt(m,x.r||1);return x.g?x.g+' g':qTxt(x.r||1)}
 function mineRow(id,r,quick){
   const m=DB.mine[id];if(!m)return '';
   return '<div class="cell static frow"><button class="cb" style="padding-left:2px;text-align:left" onclick="openMineAmt(\''+id+'\','+r+')"><div class="tt"><p class="bd ell">'+esc(m.n)+'</p><p class="fn l2 num">'+mineSub(id,r)+'</p></div></button>'+
-    (quick?'<button class="ibtn fadd" onclick="mineQuick(\''+id+'\','+r+')" aria-label="Añadir '+esc(m.n)+', '+rSay(r)+', '+gTxt(mineAt(id,r).p).replace(' g',' gramos')+' de proteína">'+ic('plus',18,2.6)+'</button>':'')+'</div>';
+    (quick?'<button class="ibtn fadd" onclick="mineQuick(\''+id+'\','+r+')" aria-label="Añadir '+esc(m.n)+', '+mAmt(m,r,1)+', '+gTxt(mineAt(id,r).p).replace(' g',' gramos')+' de proteína">'+ic('plus',18,2.6)+'</button>':'')+'</div>';
 }
 function mineQuick(id,r){if(!DB.mine[id])return;const x=mineAt(id,r);foodPush(x);foodAdded(x)}
 
-/* raciones: − / + de media en media */
+/* cuánto: − / + de media vez en media vez, enseñando la cantidad */
 let FM=null;
 function openMineAmt(id,r,idx){FM={id,r:r||1,idx:idx==null?null:idx};openSheet(mineAmtSheet,$('sheet').classList.contains('on'))}
 function mineAmtSheet(){
   const m=DB.mine[FM.id];if(!m)return{title:'Mis platos',body:'<div class="empty">Ya no está en Mis platos.</div>'};
-  const x=mineAt(FM.id,FM.r),edit=FM.idx!=null;
+  const x=mineAt(FM.id,FM.r),edit=FM.idx!=null,A=mAmt(m,FM.r),sp=A.indexOf(' ');
   return{title:esc(m.n),body:'<div class="pad">'+
     '<div class="row" style="justify-content:center;gap:18px;padding:6px 0 2px">'+
-      '<button class="step" onclick="mineAmtAdj(-1)" aria-label="Bajar a '+rSay(Math.max(0.5,FM.r-0.5))+'"'+(FM.r<=0.5?' disabled':'')+'>'+ic('minus',24,2.6)+'</button>'+
-      '<div class="center" style="min-width:140px"><p class="famt num" aria-hidden="true">'+String(FM.r).replace('.',',')+'</p><p class="fn l2">'+(FM.r===1||FM.r===0.5?'ración':'raciones')+(m.g?' · '+x.g+' '+(m.u||'g'):'')+'</p></div>'+
-      '<button class="step" onclick="mineAmtAdj(1)" aria-label="Subir a '+rSay(Math.min(10,FM.r+0.5))+'"'+(FM.r>=10?' disabled':'')+'>'+ic('plus',24,2.6)+'</button></div>'+
-    '<div class="fchips" role="group" aria-label="Raciones">'+[0.5,1,1.5,2].map(n=>'<button class="'+(FM.r===n?'on':'')+'" onclick="FM.r='+n+';drawSheet()" aria-pressed="'+(FM.r===n)+'" aria-label="'+rSay(n)+'">'+String(n).replace('0.5','½').replace('.5','½')+'</button>').join('')+'</div>'+
+      '<button class="step" onclick="mineAmtAdj(-1)" aria-label="Bajar a '+mAmt(m,Math.max(0.5,FM.r-0.5),1)+'"'+(FM.r<=0.5?' disabled':'')+'>'+ic('minus',24,2.6)+'</button>'+
+      '<div class="center" style="min-width:140px"><p class="famt num" aria-hidden="true">'+A.slice(0,sp)+'</p><p class="fn l2" aria-hidden="true">'+A.slice(sp+1)+'</p></div>'+
+      '<button class="step" onclick="mineAmtAdj(1)" aria-label="Subir a '+mAmt(m,Math.min(10,FM.r+0.5),1)+'"'+(FM.r>=10?' disabled':'')+'>'+ic('plus',24,2.6)+'</button></div>'+
+    '<div class="fchips" role="group" aria-label="Cantidad">'+[0.5,1,1.5,2].map(n=>'<button class="'+(FM.r===n?'on':'')+'" onclick="FM.r='+n+';drawSheet()" aria-pressed="'+(FM.r===n)+'" aria-label="'+mAmt(m,n,1)+'">'+mAmt(m,n).replace(/ \(.*\)$/,'')+'</button>').join('')+'</div>'+
     '<div class="card center" style="margin-top:16px;padding:14px" aria-live="polite"><p class="fn l2">Proteína</p><p class="t1 num">'+gTxt(x.p)+'</p></div>'+
     '<div class="stack" style="margin-top:18px"><button class="btn pri" onclick="mineAmtOk()">'+(edit?'Guardar':'Añadir')+'</button>'+
     (edit?'<button class="btn sec danger" onclick="askFoodDel('+FM.idx+')">Quitar</button>':'')+
     '<button class="btn tx" onclick="openMineEdit(\''+FM.id+'\')">Editar «'+esc(m.n)+'»</button></div>'+
-    '<p class="c1 l3" style="padding:12px 6px 0">Una ración: '+gTxt(m.p)+' de proteína'+(m.g?' en '+m.g+' '+(m.u||'g'):'')+'.'+(m.src==='off'?' Datos de Open Food Facts.':'')+'</p></div>'};
+    (m.src==='off'?'<p class="c1 l3" style="padding:12px 6px 0">Datos de Open Food Facts, revisados por ti al guardarlo.</p>':'')+'</div>'};
 }
-function mineAmtAdj(d){FM.r=Math.max(0.5,Math.min(10,FM.r+d*0.5));drawSheet();say(rSay(FM.r)+', '+gTxt(mineAt(FM.id,FM.r).p).replace(' g',' gramos')+' de proteína')}
+function mineAmtAdj(d){FM.r=Math.max(0.5,Math.min(10,FM.r+d*0.5));drawSheet();const m=DB.mine[FM.id];say(mAmt(m,FM.r,1)+', '+gTxt(mineAt(FM.id,FM.r).p).replace(' g',' gramos')+' de proteína')}
 function mineAmtOk(){
   const x=mineAt(FM.id,FM.r);
-  if(FM.idx!=null){const L=dayItems(fdDay()),o=L[FM.idx];if(!o)return closeSheet();x.t=o.t||'';L[FM.idx]=x;save();closeSheet();render();toast('Guardado');say('Guardado: '+x.n+', '+rSay(FM.r));return}
+  if(FM.idx!=null){const L=dayItems(fdDay()),o=L[FM.idx];if(!o)return closeSheet();x.t=o.t||'';L[FM.idx]=x;save();closeSheet();render();toast('Guardado');say('Guardado: '+x.n+', '+mAmt(DB.mine[FM.id],FM.r,1));return}
   foodPush(x);foodAdded(x);
 }
 
@@ -311,7 +323,7 @@ function openMineList(){openSheet(mineListSheet)}
 function mineListSheet(){
   const L=mineIds();
   return{title:'Mis platos y productos',body:'<div class="pad">'+
-    (L.length?'<div class="group">'+L.map(id=>{const m=DB.mine[id];return '<button class="cell" onclick="openMineEdit(\''+id+'\')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(m.n)+'</p><p class="fn l2 num">'+(m.parts?m.parts.length+(m.parts.length===1?' alimento':' alimentos')+' · ':'')+gTxt(m.p)+' de proteína por ración</p></div>'+chev()+'</div></button>'}).join('')+'</div>'
+    (L.length?'<div class="group">'+L.map(id=>{const m=DB.mine[id];return '<button class="cell" onclick="openMineEdit(\''+id+'\')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(m.n)+'</p><p class="fn l2 num">'+mineSub(id,1)+'</p></div>'+chev()+'</div></button>'}).join('')+'</div>'
       :'<p class="sb l2 center balance" style="padding:4px 12px 4px">Guarda lo que tomas a menudo, como un batido o tu desayuno de siempre, y apúntalo de un toque.</p>')+
     '<div class="stack" style="margin-top:16px"><button class="btn '+(L.length?'sec':'pri')+'" onclick="openMineNew()">Crear plato o producto</button><button class="btn sec" onclick="openScan()">Escanear un código de barras</button></div></div>'};
 }
@@ -328,57 +340,83 @@ function mineSaved(id,isNew){
   else{closeSheet();toast('Guardado');say('Guardado: '+m.n)}
 }
 
-/* producto: su proteína por ración o, si la etiqueta da los valores por 100 g, por 100 g y el tamaño de tu ración */
+/* producto: «La etiqueta dice» (tal cual: proteína y, si quieres, el resto, por la cantidad que diga) y «Te tomas» (lo tuyo).
+   No hay nada que elegir: la etiqueta no cambia al tocar lo que te tomas. Lo opcional se guarda para el futuro modo calorías. */
 let PF=null;
-const pNum=v=>{const n=parseFloat(String(v).replace(',','.'));return isFinite(n)?n:NaN};
+const pNum=v=>{const t=String(v==null?'':v).trim().replace(',','.');if(!t)return null;const n=parseFloat(t);return isFinite(n)&&/^\d*\.?\d+$/.test(t)?n:NaN};
+const nStr=n=>n==null?'':String(n).replace('.',',');
+/* resto de la etiqueta, en el orden de la etiqueta europea */
+const LBL_UI=[['k','Valor energético','kcal'],['f','Grasas','g'],['fs','de las cuales saturadas','g'],['c','Hidratos de carbono','g'],['s','de los cuales azúcares','g'],['fi','Fibra','g'],['sal','Sal','g']];
+function prodBlank(code){return{id:null,n:'',b:'',code:code||'',src:'',q:'100',u:'g',L:{p:''},t:'',more:false}}
 function openProd(id,pre){
   const m=id?DB.mine[id]:null;
-  PF=pre||(m?{id,n:m.n,b:m.b||'',code:m.code||'',src:m.src||'',u:m.u||'g',per:m.p100!=null?100:1,p100:m.p100!=null?String(m.p100).replace('.',','):'',k100:m.k100,c100:m.c100,f100:m.f100,g:m.g||'',p:Math.round(m.p*10)/10,k:m.k||''}
-    :{id:null,n:'',b:'',code:'',src:'',u:'g',per:1,p100:'',g:'',p:20,k:''});
+  if(pre)PF=pre;
+  else if(m){PF={id,n:m.n,b:m.b||'',code:m.code||'',src:m.src||'',q:nStr(m.L.q),u:m.L.u,L:{},t:nStr(m.t),more:false};['p'].concat(LBL.map(z=>z[0])).forEach(k=>PF.L[k]=nStr(m.L[k]))}
+  else PF=prodBlank();
   openSheet(prodSheet,$('sheet').classList.contains('on'),!!pre);
 }
-function prodVals(){
-  if(PF.per===100){const p100=pNum(PF.p100),g=Math.round(pNum(PF.g));if(!(p100>=0&&p100<=100)||!(g>=1&&g<=5000))return null;const q=g/100;
-    const o={p:fr1(p100*q),k:PF.k100!=null?Math.round(PF.k100*q):0,g,p100:fr1(p100)};if(PF.k100!=null)o.k100=PF.k100;if(PF.c100!=null){o.c100=PF.c100;o.c=fr1(PF.c100*q)}if(PF.f100!=null){o.f100=PF.f100;o.f=fr1(PF.f100*q)}return o}
-  const p=pNum(PF.p),g=Math.round(pNum(PF.g)),k=Math.round(pNum(PF.k));if(!(p>=0&&p<=500))return null;const o={p:fr1(p),k:k>=0&&k<=10000?k:0};if(g>=1&&g<=5000)o.g=g;return o;
+const lblN=()=>LBL_UI.filter(([k])=>String(PF.L[k]||'').trim()).length;
+/* lee el formulario: {L, t} o {err, el} */
+function prodRead(){
+  const p=pNum(PF.L.p),q=pNum(PF.q),t=pNum(PF.t),U=PF.u;
+  if(p==null)return{err:'Falta la proteína de la etiqueta',el:'pfP'};
+  if(isNaN(p)||p<0||p>5000)return{err:'Revisa la proteína',el:'pfP'};
+  if(q==null||isNaN(q)||q<=0||q>5000)return{err:'Revisa la cantidad de la etiqueta',el:'pfQ'};
+  if(U!=='u'&&p>q)return{err:'La proteína no puede pasar de '+nStr(q)+' '+U+': revisa las cifras',el:'pfP'};
+  const L={q:r1v(q),u:U,p:r1v(p)};
+  for(const [k,name] of LBL_UI){const n=pNum(PF.L[k]);if(n==null)continue;if(isNaN(n)||n<0)return{err:'Revisa «'+name.replace(/^de l[oa]s cuales /,'')+'»',el:'pf_'+k};L[k]=k==='k'?Math.round(n):r1v(n)}
+  if(t==null)return{err:'Falta lo que te tomas',el:'pfT'};
+  if(isNaN(t)||t<=0||t>5000)return{err:'Revisa lo que te tomas',el:'pfT'};
+  return{L,t:r1v(t)};
+}
+function prodRes(){
+  const v=prodRead();
+  if(v.err)return '<p class="fn l2">Cada vez que lo tomas</p><p class="bd" style="padding-top:4px">'+v.err+'</p>';
+  const o=mineCalc({L:v.L,t:v.t});
+  return '<p class="fn l2">Cada vez que lo tomas</p><p class="t1 num">'+gTxt(o.p)+' de proteína</p><p class="fn l2 num">en '+mAmt(o,1)+'</p>';
 }
 function prodSheet(){
-  const v=prodVals(),U=PF.u||'g',off=PF.src==='off';
-  const res=v?'<p class="fn l2">Una ración</p><p class="t1 num">'+gTxt(v.p)+' de proteína</p>'+(v.g?'<p class="fn l2 num">en '+v.g+' '+U+'</p>':''):'<p class="fn l2">'+(PF.per===100&&!String(PF.p100).trim()?'Falta la proteína por 100 '+U+': mírala en la etiqueta':'Revisa las cifras')+'</p>';
+  const U=PF.u,off=PF.src==='off',per=nStr(pNum(PF.q)||'')||'…',nl=lblN();
+  const inp=(id,val,on,ph,lab)=>'<input id="'+id+'" type="text" inputmode="decimal" maxlength="7" value="'+esc(val||'')+'"'+(ph?' placeholder="'+ph+'"':'')+' oninput="'+on+';prodLive()"'+(lab?' aria-label="'+lab+'"':'')+'>';
   return{title:PF.id?'Editar producto':(off?'¿Es este?':'Producto'),body:'<div class="pad">'+
     (off&&!PF.id?'<p class="sb l2 center balance" style="padding:0 8px 14px">Encontrado en Open Food Facts'+(PF.code?' · '+PF.code:'')+'. Comprueba las cifras con la etiqueta antes de guardar.</p>':'')+
     '<div class="field"><label for="pfN">Nombre</label><input id="pfN" maxlength="60" value="'+esc(PF.n)+'" placeholder="Por ejemplo, Plenny Shake" oninput="PF.n=this.value;prodLive()"></div>'+
     (PF.b?'<p class="fn l2" style="padding:6px 6px 0">Marca: '+esc(PF.b)+'</p>':'')+
-    '<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">La etiqueta da la proteína</p>'+
-    '<div class="segc" role="group" aria-label="La etiqueta da la proteína">'+[[1,'Por ración'],[100,'Por 100 '+U]].map(([k,t])=>'<button class="'+(PF.per===k?'on':'')+'" onclick="prodPer('+k+')" aria-pressed="'+(PF.per===k)+'">'+t+'</button>').join('')+'</div>'+
-    (PF.per===100
-      ?'<div class="row" style="gap:12px;margin-top:14px"><div class="field grow"><label for="pfP">Proteína por 100 '+U+' (g)</label><input id="pfP" type="text" inputmode="decimal" maxlength="5" value="'+esc(PF.p100)+'" oninput="PF.p100=this.value;prodLive()"></div>'+
-        '<div class="field grow"><label for="pfG">Tu ración ('+U+')</label><input id="pfG" type="number" inputmode="numeric" min="1" max="5000" value="'+esc(PF.g)+'" oninput="PF.g=this.value;prodLive()"></div></div>'+
-        (PF.k100!=null?'<p class="fn l2" style="padding:6px 6px 0">Energía: '+Math.round(PF.k100)+' kcal por 100 '+U+'.</p>':'')
-      :'<div class="row" style="justify-content:center;gap:18px;margin-top:14px">'+
-        '<button class="step" onclick="prodStep(-1)" aria-label="Bajar a '+Math.max(0,Math.round(pNum(PF.p)||0)-1)+' gramos">'+ic('minus',24,2.6)+'</button>'+
-        '<div class="center" style="min-width:120px"><input id="pfP" class="famt num" type="text" inputmode="decimal" maxlength="5" value="'+esc(String(PF.p).replace('.',','))+'" oninput="PF.p=this.value;prodLive()" aria-label="Gramos de proteína por ración"><p class="fn l2">g de proteína por ración</p></div>'+
-        '<button class="step" onclick="prodStep(1)" aria-label="Subir a '+(Math.round(pNum(PF.p)||0)+1)+' gramos">'+ic('plus',24,2.6)+'</button></div>'+
-        '<div class="field" style="margin-top:14px"><label for="pfG">Cuánto es una ración (opcional, en '+U+')</label><input id="pfG" type="number" inputmode="numeric" min="1" max="5000" value="'+esc(PF.g)+'" placeholder="Por ejemplo, 400" oninput="PF.g=this.value;prodLive()"></div>')+
-    '<div class="card center" style="margin-top:16px;padding:14px" id="pfRes" aria-live="polite">'+res+'</div>'+
-    '<div class="stack" style="margin-top:18px"><button class="btn pri" id="pfOk" onclick="prodOk()"'+(v&&sStr(PF.n,60)?'':' disabled')+'>'+(PF.id?'Guardar':'Guardar y apuntar')+'</button>'+
+    // la etiqueta, tal cual
+    '<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">La etiqueta dice</p>'+
+      '<div class="row" style="gap:10px;align-items:flex-end">'+
+        '<div class="field grow"><label for="pfP">Proteína (g)</label>'+inp('pfP',PF.L.p,'PF.L.p=this.value','20')+'</div>'+
+        '<p class="sb" style="padding-bottom:13px">en</p>'+
+        '<div class="field grow"><label for="pfQ">Cantidad</label>'+inp('pfQ',PF.q,'PF.q=this.value',U==='u'?'1':'100')+'</div></div>'+
+      '<div class="segc" role="group" aria-label="Unidad de la etiqueta" style="margin-top:10px">'+[['g','g'],['ml','ml'],['u','unidad']].map(([k,t])=>'<button class="'+(U===k?'on':'')+'" onclick="prodUnit(\''+k+'\')" aria-pressed="'+(U===k)+'">'+t+'</button>').join('')+'</div>'+
+      '<p class="fn l2" id="pfSay" style="padding:8px 6px 0">'+prodSay()+'</p>'+
+      // resto de la etiqueta (opcional)
+      '<div class="group" style="margin-top:14px"><button class="cell" onclick="PF.more=!PF.more;drawSheet()" aria-expanded="'+PF.more+'"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd">Resto de la etiqueta</p><p class="fn l2">'+(nl?nl+' de 7 datos':'Opcional · para el modo calorías')+'</p></div><span style="transform:rotate('+(PF.more?'-90':'90')+'deg);display:flex">'+chev()+'</span></div></button></div>'+
+      (PF.more?'<div style="padding-top:12px"><p class="fn l2" style="padding:0 6px 10px">Por '+per+' '+uWord(U,pNum(PF.q)||1)+', como en la etiqueta. Ahora solo cuenta la proteína: el resto se guarda para cuando llegue el modo calorías.</p>'+
+        '<div style="display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px">'+LBL_UI.map(([k,name,un])=>'<div class="field"'+(k==='k'?' style="grid-column:1/-1"':'')+'><label class="ell" for="pf_'+k+'"'+(name.startsWith('de ')?' style="padding-left:10px"':'')+'>'+name+' ('+un+')</label>'+inp('pf_'+k,PF.L[k],'PF.L.'+k+'=this.value')+'</div>').join('')+'</div></div>':'')+
+    // lo tuyo
+    '<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">Te tomas</p>'+
+    '<div class="row" style="gap:10px;align-items:center"><div class="field grow"><input id="pfT" type="text" inputmode="decimal" maxlength="7" value="'+esc(PF.t)+'" placeholder="'+(U==='u'?'1':'Por ejemplo, 400')+'" oninput="PF.t=this.value;prodLive()" aria-label="Te tomas, en '+uWord(U,2,U_SAY)+'"></div><p class="bd" id="pfTu" style="min-width:72px">'+uWord(U,pNum(PF.t)||2)+'</p></div>'+
+    '<p class="fn l2" style="padding:6px 6px 0">Cada vez. Al apuntarlo puedes poner la mitad o el doble.</p>'+
+    '<div class="card center" style="margin-top:16px;padding:14px" id="pfRes" aria-live="polite">'+prodRes()+'</div>'+
+    '<div class="stack" style="margin-top:18px"><button class="btn pri" id="pfOk" onclick="prodOk()"'+(prodRead().err||!sStr(PF.n,60)?' disabled':'')+'>'+(PF.id?'Guardar':'Guardar y apuntar')+'</button>'+
     (PF.id?'<button class="btn sec danger" onclick="askMineDel(\''+PF.id+'\')">Borrar de Mis platos</button>':'')+'</div>'+
     (off?'<p class="c1 l3" style="padding:12px 6px 0">Datos de Open Food Facts, base de datos abierta de alimentos (licencia ODbL). Puede tener errores: si no coincide, vale lo que diga la etiqueta.</p>':'')+'</div>'};
 }
-function prodPer(k){
-  if(PF.per===k)return;const v=prodVals();
-  if(k===100&&v&&v.g&&!String(PF.p100).trim())PF.p100=String(fr1(v.p/v.g*100)).replace('.',',');
-  if(k===1&&v)PF.p=v.p;PF.per=k;drawSheet();
+/* la etiqueta leída en una frase, para confirmar que se ha entendido bien */
+function prodSay(){const p=pNum(PF.L.p),q=pNum(PF.q);if(p==null||isNaN(p)||!q)return 'Copia la proteína y la cantidad tal como vienen en la etiqueta.';return nStr(r1v(p))+' g de proteína por cada '+(PF.u==='u'&&q===1?'unidad':nStr(r1v(q))+' '+uWord(PF.u,q))}
+function prodUnit(u){if(PF.u===u)return;const was=PF.u;PF.u=u;if(u==='u'&&(PF.q==='100'||!PF.q))PF.q='1';else if(was==='u'&&PF.q==='1')PF.q='100';drawSheet();say('Unidad: '+uWord(u,2,U_SAY)+'. '+prodSay())}
+function prodLive(){
+  $('pfRes').innerHTML=prodRes();$('pfSay').textContent=prodSay();$('pfTu').textContent=uWord(PF.u,pNum(PF.t)||2);
+  $('pfOk').disabled=!!(prodRead().err||!sStr(PF.n,60));
 }
-function prodStep(d){PF.p=Math.max(0,Math.min(500,Math.round(pNum(PF.p)||0)+d));drawSheet();say(PF.p+' gramos de proteína por ración')}
-function prodLive(){const v=prodVals(),U=PF.u||'g';$('pfRes').innerHTML=v?'<p class="fn l2">Una ración</p><p class="t1 num">'+gTxt(v.p)+' de proteína</p>'+(v.g?'<p class="fn l2 num">en '+v.g+' '+U+'</p>':''):'<p class="fn l2">'+(PF.per===100&&!String(PF.p100).trim()?'Falta la proteína por 100 '+U+': mírala en la etiqueta':'Revisa las cifras')+'</p>';$('pfOk').disabled=!(v&&sStr(PF.n,60))}
 function prodOk(){
-  const v=prodVals(),n=sStr(PF.n,60);if(!v||!n)return;const isNew=!PF.id,id=PF.id||mineNewId();
-  const m=Object.assign({n,ts:Date.now()},v);if(PF.u==='ml')m.u='ml';if(PF.code)m.code=PF.code;if(PF.src==='off')m.src='off';if(PF.b)m.b=sStr(PF.b,40);
-  DB.mine[id]=m;mineSaved(id,isNew);
+  const v=prodRead(),n=sStr(PF.n,60);if(v.err||!n)return;const isNew=!PF.id,id=PF.id||mineNewId();
+  const m={n,L:v.L,t:v.t,ts:Date.now()};if(PF.code)m.code=PF.code;if(PF.src==='off')m.src='off';if(PF.b)m.b=sStr(PF.b,40);
+  DB.mine[id]=mineCalc(m);mineSaved(id,isNew);
 }
 
-/* plato: varios alimentos de la lista con sus gramos; la ración es el plato entero */
+/* plato: varios alimentos de la lista con sus gramos; al apuntarlo, una vez = el plato entero */
 let PL=null;
 function openPlato(id){const m=id?DB.mine[id]:null;PL={id:id||null,n:m?m.n:'',parts:m?m.parts.map(q=>q.slice()):[]};openSheet(platoSheet,$('sheet').classList.contains('on'))}
 function plTot(){return PL.parts.reduce((a,[cid,g])=>{const f=FOOD_BY[cid];if(!f)return a;const x=foodAt(f,g);a.p+=x.p;a.k+=x.k;a.c+=x.c;a.f+=x.f;a.g+=g;return a},{p:0,k:0,c:0,f:0,g:0})}
@@ -395,7 +433,7 @@ function platoSheet(){
     '<div class="card center" style="margin-top:16px;padding:14px" aria-live="polite"><p class="fn l2">El plato entero</p><p class="t1 num">'+gTxt(t.p)+' de proteína</p>'+(t.g?'<p class="fn l2 num">'+t.g+' g</p>':'')+'</div>'+
     '<div class="stack" style="margin-top:18px"><button class="btn pri" id="plOk" onclick="platoOk()"'+(ok?'':' disabled')+'>'+(PL.id?'Guardar':'Guardar y apuntar')+'</button>'+
     (PL.id?'<button class="btn sec danger" onclick="askMineDel(\''+PL.id+'\')">Borrar de Mis platos</button>':'')+'</div>'+
-    '<p class="c1 l3" style="padding:12px 6px 0">Valores de la tabla Ciqual 2025. Al apuntarlo, una ración es el plato entero; puedes poner media o dos.</p></div>'};
+    '<p class="c1 l3" style="padding:12px 6px 0">Valores de la tabla Ciqual 2025. Al apuntarlo cuenta como el plato entero; puedes poner medio o dos.</p></div>'};
 }
 function openPlPick(){FQ='';openSheet(()=>({title:'Añadir al plato',body:'<div class="pad"><div class="field"><input id="fQ" type="search" placeholder="Buscar alimento" value="'+esc(FQ)+'" oninput="FQ=this.value;$(\'fRes\').innerHTML=foodResults(1)" aria-label="Buscar alimento" autocomplete="off"></div><div id="fRes">'+foodResults(1)+'</div><div style="height:12px"></div></div>'}),true)}
 /* vuelve a la hoja del plato, quitando las de elegir alimento y cantidad */
@@ -443,7 +481,7 @@ async function scanStart(){
   },250);
 }
 function offMsg(title,text,btns){openSheet(()=>({title,body:'<div class="pad"><p class="sb l2 center balance" style="padding:4px 8px 0">'+text+'</p><div class="stack" style="margin-top:18px">'+btns+'</div></div>'}),true,true);say(title+'. '+text.replace(/<[^>]+>/g,''))}
-const offManual=code=>'<button class="btn pri" onclick="openProd(null,{id:null,n:\'\',b:\'\',code:\''+code+'\',src:\'\',u:\'g\',per:1,p100:\'\',g:\'\',p:20,k:\'\'})">Crearlo a mano</button><button class="btn sec" onclick="openScan()">Probar otro código</button>';
+const offManual=code=>'<button class="btn pri" onclick="openProd(null,prodBlank(\''+code+'\'))">Crearlo a mano</button><button class="btn sec" onclick="openScan()">Probar otro código</button>';
 async function offLookup(code){
   code=String(code||'').replace(/\D/g,'');if(!/^\d{8,14}$/.test(code))return;
   const had=mineIds().find(id=>DB.mine[id].code===code);
@@ -463,14 +501,17 @@ async function offLookup(code){
   if(!P)return offMsg('No está en Open Food Facts','El código '+code+' no aparece. Créalo a mano con la etiqueta y la próxima vez ya lo tendrás.',offManual(code));
   PF=offToPF(P,code);openProd(null,PF);
 }
-const V_APP='28';
+const V_APP='29';
 function offToPF(P,code){
-  const N=P.nutriments||{},num=k=>{const n=parseFloat(N[k]);return isFinite(n)&&n>=0?Math.round(n*10)/10:null};
+  const N=P.nutriments||{},num=k=>{const n=parseFloat(N[k]);return isFinite(n)&&n>=0?r1v(n):null};
   const q=String(P.quantity||'')+' '+String(P.serving_size||''),ml=/\d\s*(ml|cl|l)\b/i.test(q)&&!/\d\s*g\b/i.test(String(P.serving_size||''));
-  const sq=parseFloat(P.serving_quantity),p100=num('proteins_100g');
-  const o={id:null,n:sStr(P.product_name_es||P.product_name||P.generic_name||'',60),b:sStr(String(P.brands||'').split(',')[0],40),code,src:'off',u:ml?'ml':'g',per:100,
-    p100:p100==null?'':String(Math.min(100,p100)).replace('.',','),g:sq>=1&&sq<=5000?Math.round(sq):100,p:20,k:''};
-  const k=num('energy-kcal_100g'),c=num('carbohydrates_100g'),f=num('fat_100g');
-  if(k!=null&&k<=1000)o.k100=k;if(c!=null&&c<=100)o.c100=c;if(f!=null&&f<=100)o.f100=f;
+  const sq=parseFloat(P.serving_quantity),o=prodBlank(code);
+  // Open Food Facts da los valores por 100 g (o por 100 ml en bebidas): la etiqueta, tal cual
+  o.n=sStr(P.product_name_es||P.product_name||P.generic_name||'',60);o.b=sStr(String(P.brands||'').split(',')[0],40);o.src='off';o.u=ml?'ml':'g';o.q='100';
+  let kc=num('energy-kcal_100g');if(kc==null){const kj=num('energy-kj_100g');if(kj!=null)kc=Math.round(kj/4.184)}
+  const V={p:num('proteins_100g'),k:kc==null?null:Math.round(kc),f:num('fat_100g'),fs:num('saturated-fat_100g'),c:num('carbohydrates_100g'),s:num('sugars_100g'),fi:num('fiber_100g'),sal:num('salt_100g')};
+  Object.keys(V).forEach(k=>o.L[k]=nStr(V[k]));
+  if(V.p!=null&&V.p>100)o.L.p='';
+  o.t=sq>=1&&sq<=5000?nStr(Math.round(sq)):'';
   return o;
 }
