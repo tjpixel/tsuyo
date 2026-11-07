@@ -180,6 +180,14 @@ input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appear
 .fday .ibtn:disabled{opacity:.3}
 .frow{padding-left:16px}
 .frow .cb{background:none;border-radius:0}
+.qrow{padding-left:0}
+.qmain{flex:1;min-width:0;display:flex;align-items:stretch;padding-left:16px;text-align:left;color:inherit}
+.qmain .cb{padding-right:4px}
+.qmain:active{background:var(--fill2)}
+.qside{display:flex;align-items:center;padding-right:6px;border-top:.5px solid transparent}
+.cell + .qrow .qside{border-top-color:var(--sep)}
+.qmore{width:40px;height:40px;color:var(--label2)}
+.qmore:active{background:var(--fill2)}
 .fadd{align-self:center;margin-right:8px;width:40px;height:40px;background:var(--tint-soft);color:var(--ink)}
 .famt{width:140px;border:0;font-family:ui-rounded,"SF Pro Rounded",-apple-system,system-ui,sans-serif;background:none;text-align:center;font-size:56px;line-height:64px;font-weight:700;letter-spacing:-1px;color:var(--label);outline:none;padding:0}
 .famt:focus{box-shadow:inset 0 -2px 0 var(--ink)}

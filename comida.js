@@ -42,8 +42,13 @@ function foodHabits(max){
 function habRow(h){
   const x=h.x;if(FOOD_BY[x.id])return foodRow(FOOD_BY[x.id],x.g||FOOD_BY[x.id][7],1);
   if(x.id[0]==='m')return mineRow(x.id,x.r||1,1);
-  return '<div class="cell static frow"><button class="cb" style="padding-left:2px;text-align:left" onclick="openFoodQ(null,\''+h.k.replace(/'/g,'')+'\')"><div class="tt"><p class="bd ell">'+esc(x.n)+'</p><p class="fn l2 num">A ojo · '+gTxt(x.p)+' de proteína</p></div></button>'+
-    '<button class="ibtn fadd" onclick="foodQuickK(\''+h.k.replace(/'/g,'')+'\')" aria-label="Añadir '+esc(x.n)+', '+gTxt(x.p).replace(' g',' gramos')+' de proteína">'+ic('plus',18,2.6)+'</button></div>';
+  const k=h.k.replace(/'/g,'');
+  return qRow('foodQuickK(\''+k+'\')','Añadir '+esc(x.n)+', '+gTxt(x.p).replace(' g',' gramos')+' de proteína',esc(x.n),'A ojo · '+gTxt(x.p)+' de proteína','openFoodQ(null,\''+k+'\')','Otra cantidad de '+esc(x.n));
+}
+/* fila de un toque (tsuyo-v31): tocarla lo añade; el ⋯ de la derecha es para cambiarlo */
+function qRow(add,addLab,title,sub,more,moreLab){
+  return '<div class="cell static qrow"><button class="qmain" onclick="'+add+'" aria-label="'+addLab+'"><span class="ic soft" aria-hidden="true">'+ic('plus',16,2.6)+'</span><div class="cb"><div class="tt"><p class="bd ell">'+title+'</p><p class="fn l2 num">'+sub+'</p></div></div></button>'+
+    '<span class="qside"><button class="ibtn qmore" onclick="'+more+'" aria-label="'+moreLab+'">'+ic('more',20)+'</button></span></div>';
 }
 function foodQuickK(k){const h=foodHabits(50).find(z=>z.k===k);if(!h)return;const x={n:h.x.n,id:'q',p:h.x.p,k:h.x.k||0};foodPush(x);foodAdded(x)}
 /* semana de lunes a domingo del día que se está viendo */
@@ -162,6 +167,7 @@ let FQ='';
 function openFoodAdd(){FQ='';openSheet(foodAddSheet)}
 function foodRow(f,g,quick,pick){
   const x=foodAt(f,g),U=f[8];
+  if(quick)return qRow('foodQuick(\''+x.id+'\','+g+')','Añadir '+esc(f[1])+', '+g+' gramos, '+gTxt(x.p).replace(' g',' gramos')+' de proteína',esc(f[1]),(U&&g%U[1]===0?g/U[1]+' '+U[0]+(g/U[1]===1?'':'s')+' · ':'')+g+' g · '+gTxt(x.p)+' de proteína','openFoodAmt(\''+x.id+'\','+g+')','Otra cantidad de '+esc(f[1]));
   return '<div class="cell static frow"><button class="cb" style="padding-left:2px;text-align:left" onclick="openFoodAmt(\''+x.id+'\','+g+(pick?',null,1':'')+')"><div class="tt"><p class="bd ell">'+esc(f[1])+'</p><p class="fn l2 num">'+(U&&g%U[1]===0?g/U[1]+' '+U[0]+(g/U[1]===1?'':'s')+' · ':'')+g+' g · '+gTxt(x.p)+' de proteína</p></div></button>'+
     (quick?'<button class="ibtn fadd" onclick="foodQuick(\''+x.id+'\','+g+')" aria-label="Añadir '+esc(f[1])+', '+g+' gramos">'+ic('plus',18,2.6)+'</button>':'')+'</div>';
 }
@@ -193,7 +199,7 @@ function foodPush(x){
 }
 function foodAdded(x){
   const goal=protGoal(),p=sumP(fdDay());closeSheet();render();
-  toast('Añadido'+(fdDay()===T()?'':' a '+foodDayTxt(fdDay()).toLowerCase())+' · '+Math.round(p)+' de '+goal+' g');
+  const nm=x.n.length>18?x.n.slice(0,17)+'…':x.n;toast(fdDay()===T()?'+ '+nm+' · '+Math.round(p)+' de '+goal+' g':'Añadido a '+foodDayTxt(fdDay()).toLowerCase()+' · '+Math.round(p)+' de '+goal+' g');
   say('Añadido: '+x.n+', '+gTxt(x.p).replace(' g',' gramos')+' de proteína. '+protSay(p,goal));
 }
 function foodQuick(id,g){const x=foodAt(FOOD_BY[id],g);foodPush(x);foodAdded(x)}
@@ -288,10 +294,19 @@ function mineSub(id,r){const m=DB.mine[id];return mAmt(m,r)+' · '+gTxt(mineAt(i
 function itemAmt(x){const m=DB.mine[x.id];if(m&&!m.parts&&m.u!=='u'&&x.g)return x.g+' '+(m.u||'g');if(m)return mAmt(m,x.r||1);return x.g?x.g+' g':qTxt(x.r||1)}
 function mineRow(id,r,quick){
   const m=DB.mine[id];if(!m)return '';
-  return '<div class="cell static frow"><button class="cb" style="padding-left:2px;text-align:left" onclick="openMineAmt(\''+id+'\','+r+')"><div class="tt"><p class="bd ell">'+esc(m.n)+'</p><p class="fn l2 num">'+mineSub(id,r)+'</p></div></button>'+
-    (quick?'<button class="ibtn fadd" onclick="mineQuick(\''+id+'\','+r+')" aria-label="Añadir '+esc(m.n)+', '+mAmt(m,r,1)+', '+gTxt(mineAt(id,r).p).replace(' g',' gramos')+' de proteína">'+ic('plus',18,2.6)+'</button>':'')+'</div>';
+  return qRow('mineQuick(\''+id+'\','+r+')','Añadir '+esc(m.n)+', '+mAmt(m,r,1)+', '+gTxt(mineAt(id,r).p).replace(' g',' gramos')+' de proteína',esc(m.n),mineSub(id,r),'openMineMore(\''+id+'\','+r+')','Opciones de '+esc(m.n));
 }
 function mineQuick(id,r){if(!DB.mine[id])return;const x=mineAt(id,r);foodPush(x);foodAdded(x)}
+/* ⋯ de un plato o producto: otra cantidad, editarlo o borrarlo */
+function openMineMore(id,r){
+  const m=DB.mine[id];if(!m)return;
+  openSheet(()=>{const m=DB.mine[id];if(!m)return{title:'Mis platos',body:'<div class="empty">Ya no está en Mis platos.</div>'};
+    return{title:esc(m.n),body:'<div class="pad"><p class="fn l2 center num" style="padding:0 8px 14px">'+mineSub(id,r)+'</p><div class="group">'+
+    '<button class="cell" onclick="openMineAmt(\''+id+'\','+r+')"><span class="ic soft">'+ic('plus',16,2.6)+'</span><div class="cb"><div class="tt"><p class="bd">Añadir otra cantidad</p><p class="fn l2">Media, una y media, dos…</p></div>'+chev()+'</div></button>'+
+    '<button class="cell" onclick="openMineEdit(\''+id+'\')"><span class="ic gray">'+ic('pen',16)+'</span><div class="cb"><div class="tt"><p class="bd">Editar</p><p class="fn l2">'+(m.parts?'Nombre y alimentos':'Nombre, etiqueta y lo que te tomas')+'</p></div>'+chev()+'</div></button></div>'+
+    '<div class="group" style="margin-top:14px"><button class="cell" onclick="askMineDel(\''+id+'\')"><span class="ic red">'+ic('trash',16)+'</span><div class="cb"><span class="tt bd red">Borrar de Mis platos</span></div></button></div>'+
+    '<p class="c1 l3 center" style="padding:12px 8px 0">Lo que ya apuntaste no cambia.</p></div>'}},true);
+}
 
 /* cuánto: − / + de media vez en media vez, enseñando la cantidad */
 let FM=null;
