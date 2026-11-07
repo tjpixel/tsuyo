@@ -5,7 +5,7 @@
 /* ═════ ICONOS ═════ */
 const IC={
   chevR:'<path d="M9 5.5l6.5 6.5L9 18.5"/>',chevL:'<path d="M14.5 5.5L8 12l6.5 6.5"/>',chevD:'<path d="M6 9.5l6 6 6-6"/>',
-  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  check:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',pill:'<g transform="rotate(-45 12 12)"><rect x="3" y="8.2" width="18" height="7.6" rx="3.8"/><path d="M12 8.2v7.6"/><path fill="currentColor" stroke="none" opacity=".4" d="M12 8.2H6.8a3.8 3.8 0 0 0 0 7.6H12z"/></g>',x:'<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
   plus:'<path d="M12 5.5v13M5.5 12h13"/>',minus:'<path d="M6 12h12"/>',up:'<path d="M12 19V5.5M6.5 11L12 5.5 17.5 11"/>',
   more:'<circle cx="5.5" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.8" fill="currentColor" stroke="none"/><circle cx="18.5" cy="12" r="1.8" fill="currentColor" stroke="none"/>',
   play:'<path fill="currentColor" stroke="none" d="M8 5.2v13.6c0 .8.9 1.3 1.6.9l10.6-6.8c.6-.4.6-1.3 0-1.7L9.6 4.3C8.9 3.9 8 4.4 8 5.2z"/>',
@@ -481,8 +481,17 @@ function blkSummary(b){
   // cinturón al empezar y al acabar
   const by=weekCounts(),good=lim=>Object.keys(by).filter(w=>w<lim&&by[w]>=need).length;
   const beltOf=n=>{let i=0;BELT_STEPS.forEach((x,k)=>{if(n>=x[2])i=k});return BELT_STEPS[i]};
-  return{b,R,n:ds.length,plan:perWeek()*12,sets,ton,min,nDur,wk,need,good:wk.filter(x=>x>=need).length,gains,recs,
+  return{b,R,n:ds.length,plan:perWeek()*12,sets,ton,min,nDur,wk,need,good:wk.filter(x=>x>=need).length,gains,recs,sup:blkSupps(R),
     b0:beltOf(good(mondayOf(R.s))),b1:beltOf(good(R.e))};
+}
+
+/* suplementos del bloque (parte 7 de Comida, tsuyo-v33): dato orientativo.
+   Cada suplemento cuenta desde el primer día que lo marcaste en el bloque, para que empezar a apuntar a mitad no baje el %. */
+function blkSupps(R){
+  const end=R.last<T()?R.last:T(),M=DB.supp||{};let tk=0,pos=0;
+  const L=(DB.cfg.supps||[]).map(x=>{const ds=Object.keys(M).filter(d=>d>=R.s&&d<=end&&M[d]&&M[d][x.id]).sort();
+    if(!ds.length)return null;const n=dDays(ds[0],end)+1;tk+=ds.length;pos+=n;return{t:x.t,s:x.s,k:ds.length,n}}).filter(Boolean);
+  return L.length?{L,pct:Math.round(tk/pos*100)}:null;
 }
 
 /* ── pantalla ── */
@@ -546,6 +555,12 @@ function openCele(b,rev,mark){
     '<div class="card grow ce-tile"><span class="ic tint" aria-hidden="true">'+ic('trophy',20)+'</span><p class="ce-num num">'+cnt(S.recs)+'</p><p class="fn l2">récord'+(S.recs===1?' batido':'s batidos')+'</p></div>'+
     '<div class="card grow ce-tile"><div class="ce-belts" aria-hidden="true">'+(up?bc(S.b0)+ic('chevR',14,2.6)+bc(S.b1):bc(S.b1))+'</div>'+
     '<p class="hl" style="margin-top:12px">Cinturón '+S.b1[1].toLowerCase()+'</p><p class="fn l2">'+(up?'Subiste desde el '+S.b0[1].toLowerCase():'Tu constancia sigue sumando')+'</p></div></div>';
+  // suplementos: un dato orientativo, sin rachas (solo si los marcaste en el bloque)
+  if(S.sup){const U=S.sup;
+    h+='<div class="card ce-in" style="padding:16px 16px 6px" role="img" aria-label="Suplementos, orientativo: tomados el '+U.pct+' por ciento de los días. '+U.L.map(x=>x.t+', '+x.k+' de '+x.n+' días').join('; ')+'">'+
+      '<div class="row" style="gap:12px;align-items:center" aria-hidden="true"><span class="ic soft">'+ic('pill',19)+'</span><div class="grow"><p class="hl">Suplementos</p><p class="fn l2">Orientativo · desde que los marcas</p></div><p class="t2 num">'+cnt(U.pct)+'<span class="sb l3 semi"> %</span></p></div>'+
+      '<div aria-hidden="true" style="margin-top:6px">'+U.L.slice(0,6).map(x=>'<div class="row" style="gap:8px;padding:9px 0;border-top:.5px solid var(--sep)"><p class="sb ell grow">'+esc(x.t)+(x.s?'<span class="l2"> · '+esc(x.s)+'</span>':'')+'</p><span class="fn l2 num">'+x.k+' de '+x.n+' días</span></div>').join('')+'</div></div>';
+  }
   // despedida: el saludo de Deshi y lo que viene
   const nxt=inNew?'Ya estás en el bloque '+nb+'. Empieza con la reentrada: recupera tus pesos a RIR 3.':'El '+DIAS[wdOf(S.R.e)]+' '+dLong(S.R.e)+' empieza el bloque '+nb+', con una semana de reentrada para recuperar tus pesos.';
   h+='<div class="card ce-in center" style="padding:22px 20px 20px"><div style="display:flex;justify-content:center">'+dkStage('rei',2.2)+'</div>'+
@@ -840,7 +855,7 @@ function downloadData(){
 function openPrivacy(){
   openSheet(()=>({title:'Privacidad',body:'<div class="prose fn" style="font-size:15px;line-height:21px">'+
     '<h4>Responsable</h4><p>'+esc(CFG.owner)+' · '+esc(CFG.ownerEmail)+'</p>'+
-    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo. Si activas Comida, también tu peso, lo que apuntas que comes y tus platos y productos guardados.</p>'+
+    '<h4>Qué se guarda</h4><p>Tu email (si creas cuenta), tu perfil (nombre, objetivo, experiencia, días y, si las marcas, las zonas que cuidas) y tus entrenos: rutina, series, pesos, repeticiones y esfuerzo. Si activas Comida, también tu peso, lo que apuntas que comes, tus platos y productos guardados y los suplementos que marcas.</p>'+
     '<h4>Código de barras</h4><p>Al buscar un producto por su código, Tsuyo pregunta a Open Food Facts (base de datos abierta de alimentos) enviando solo ese número. Lo que encuentras se guarda en tu móvil.</p>'+
     '<h4>Para qué</h4><p>Solo para que registres y consultes tu progreso. No se usa para publicidad ni se cede a nadie.</p>'+
     '<h4>Dónde</h4><p>'+(CLOUD?'En Supabase, en servidores de la '+esc(CFG.region)+'. Cada persona solo accede a sus datos. Una copia queda en tu móvil.':'Esta versión de pruebas guarda los datos solo en este móvil.')+'</p>'+

@@ -1,10 +1,12 @@
-/* Tsuyo · Comida (módulo en pruebas, partes 1 y 2).
+/* Tsuyo · Comida (módulo en pruebas, partes 1, 2 y 7).
    Una sola cifra que importa: la proteína del día, calculada con el peso (1,6 g por kilo por defecto, hasta 2,2).
    Lo que cuenta es el total del día y la media de la semana; nada se pinta en rojo y no hay rachas.
    Los alimentos de la lista vienen de la tabla Ciqual 2025 (foods.js). Se apuntan con habituales, buscando o «a ojo».
    Datos: DB.cfg.mods.diet (encendido), DB.cfg.food = {kg, gk, man}, DB.diet[día].items = [{n,id,g,k,p,c,f,t,r}].
    Parte 2 (tsuyo-v28): Mis platos y productos (DB.mine[m…] = valores por ración) y escáner con Open Food Facts.
    Los gramos por kilo los pone Tsuyo según el objetivo (1,6; 2,2 al bajar grasa). Solo si man = 1 manda el gk que eligió la persona.
+   Parte 7 (tsuyo-v33): Suplementos de hoy. DB.cfg.supps = [{id, t = nombre, s = cantidad}] (ya venía de NEXA Fit) y DB.supp[día][id] = true si se tomó.
+   No suman proteína ni tienen rachas: solo se marcan. El resumen del bloque enseña un % orientativo (app.js, blkSupps).
    Se carga antes que app.js: las funciones de la app (openSheet, ic, $…) solo se usan al llamar. */
 'use strict';
 
@@ -91,7 +93,7 @@ function renderComida(){
       '<div class="grow"><p class="fn l2">Proteína</p><p class="t2 num">'+protLeft(p,goal)+'</p><p class="fn l2" style="margin-top:2px">'+(items.length?items.length+(items.length===1?' cosa apuntada':' cosas apuntadas'):'Nada apuntado '+(d===T()?'todavía':'ese día'))+'</p></div></div>'+
       '<button class="btn pri" style="margin-top:16px" onclick="openFoodAdd()">'+ic('plus',20,2.6)+'Apuntar</button></div>';
   }
-  h+='</div>';
+  h+='</div>'+suppSection(d);
   if(items.length){
     h+='<div class="sec"><div class="stitle"><h3 class="t3">'+(d===T()?'Hoy':foodDayTxt(d))+'</h3><span class="fn l2 num">'+gTxt(p)+' de proteína</span></div><div class="pad"><div class="group">'+
       items.map(x=>'<button class="cell" onclick="openFoodItem('+x.i+')"><div class="cb" style="padding-left:2px"><div class="tt"><p class="bd ell">'+esc(x.n)+'</p><p class="fn l2 num">'+(x.id==='q'?'A ojo':(x.id&&x.id[0]==='m'?itemAmt(x):(x.g?x.g+' g':'Importado')))+' · '+gTxt(x.p||0)+' de proteína</p></div><span class="fn l2 num">'+esc(x.t||'')+'</span>'+chev()+'</div></button>').join('')+'</div></div></div>';
@@ -110,6 +112,70 @@ function renderComida(){
   v.innerHTML=h;
 }
 function foodGoDay(n){const d=shiftD(fdDay(),n);if(d>T()||d<shiftD(T(),-60))return;FD=d;renderComida();say(foodDayTxt(d)+'. '+(protGoal()?protSay(sumP(d),protGoal()):''))}
+
+/* ═════ SUPLEMENTOS DE HOY (parte 7, tsuyo-v33) ═════
+   Lo que tomas cada día y no aporta proteína (creatina, vitaminas, omega 3…). Un toque lo marca tomado ese día.
+   Cada uno lleva su nombre y su cantidad, que pone cada uno. Sin rojos, sin rachas y sin contar proteína. */
+const SUPP_MAX=12,SUPP_SUG=['Creatina','Vitamina D','Omega 3','Magnesio','Cafeína','Hierro'];
+const suppList=()=>(DB.cfg.supps||[]);
+const suppTook=(d,id)=>!!(DB.supp&&DB.supp[d]&&DB.supp[d][id]);
+const suppName=x=>x.t+(x.s?' · '+x.s:'');
+function suppSection(d){
+  const L=suppList(),tit=d===T()?'Suplementos de hoy':'Suplementos · '+foodDayTxt(d);
+  if(!L.length)return '<div class="sec"><div class="stitle"><h3 class="t3">'+tit+'</h3></div><div class="pad"><div class="group">'+
+    '<button class="cell" onclick="openSuppEdit()"><span class="ic soft">'+ic('pill',17)+'</span><div class="cb"><div class="tt"><p class="bd">Añadir un suplemento</p><p class="fn l2">Creatina, vitamina D… y márcalo tomado de un toque</p></div>'+chev()+'</div></button></div></div></div>';
+  const n=L.filter(x=>suppTook(d,x.id)).length;
+  return '<div class="sec"><div class="stitle"><h3 class="t3">'+tit+'</h3><button class="fn link" onclick="openSuppList()" aria-label="Editar suplementos">Editar</button></div>'+
+    '<div class="pad"><div class="group" role="group" aria-label="'+tit+', '+n+' de '+L.length+' tomados">'+L.map(x=>{const on=suppTook(d,x.id);
+      return '<button class="cell" role="checkbox" aria-checked="'+on+'" onclick="suppToggle(\''+x.id+'\')" aria-label="'+esc(x.t)+(x.s?', '+esc(x.s):'')+'"><span class="exn'+(on?' done':'')+' sck" aria-hidden="true">'+(on?ic('check',14,2.8):'')+'</span>'+
+        '<div class="cb" style="padding-left:0"><div class="tt"><p class="bd ell">'+esc(x.t)+'</p>'+(x.s?'<p class="fn l2 num">'+esc(x.s)+'</p>':'')+'</div>'+(on?'<span class="fn ink semi">Tomado</span>':'')+'</div></button>'}).join('')+'</div>'+
+    '<p class="c1 l2" style="padding:8px 16px 0">Solo para marcarlos: no suman proteína.</p></div></div>';
+}
+function suppToggle(id){
+  const d=fdDay(),x=suppList().find(z=>z.id===id);if(!x)return;
+  DB.supp=DB.supp||{};const on=!suppTook(d,id);
+  if(on)(DB.supp[d]=DB.supp[d]||{})[id]=true;else{delete DB.supp[d][id];if(!Object.keys(DB.supp[d]).length)delete DB.supp[d]}
+  save();renderComida();
+  const b=[...document.querySelectorAll('#v-comida [role="checkbox"]')].find(z=>z.getAttribute('onclick')==="suppToggle('"+id+"')");if(b)b.focus({preventScroll:true});
+  const L=suppList(),n=L.filter(z=>suppTook(d,z.id)).length;
+  say(x.t+(on?', tomado':', sin marcar')+'. '+n+' de '+L.length+' '+(d===T()?'hoy':foodDayTxt(d).toLowerCase()));
+}
+/* lista para editarlos */
+function openSuppList(){openSheet(suppListSheet)}
+function suppListSheet(){
+  const L=suppList();
+  return{title:'Mis suplementos',body:'<div class="pad">'+
+    (L.length?'<div class="group">'+L.map(x=>'<button class="cell" onclick="openSuppEdit(\''+x.id+'\')"><span class="ic soft">'+ic('pill',17)+'</span><div class="cb"><div class="tt"><p class="bd ell">'+esc(x.t)+'</p><p class="fn l2 num">'+(x.s?esc(x.s):'Sin cantidad')+'</p></div>'+chev()+'</div></button>').join('')+'</div>':'')+
+    (L.length<SUPP_MAX?'<div class="stack" style="margin-top:16px"><button class="btn '+(L.length?'sec':'pri')+'" onclick="openSuppEdit()">'+ic('plus',18,2.6)+'Añadir un suplemento</button></div>':'<p class="fn l2 center" style="margin-top:14px">Como mucho '+SUPP_MAX+' suplementos.</p>')+
+    '<p class="c1 l2 balance" style="padding:14px 8px 0">Lo que aporta proteína, como un batido o Plenny, va en Mis platos y productos: así suma a tu proteína del día.</p></div>'};
+}
+/* crear o editar uno: nombre y cantidad */
+let SP=null;
+function openSuppEdit(id){
+  if(!id&&suppList().length>=SUPP_MAX){toast('Como mucho '+SUPP_MAX+' suplementos');return}
+  const x=id?suppList().find(z=>z.id===id):null;SP={id:x?x.id:null,t:x?x.t:'',s:x?x.s:''};openSheet(suppEditSheet,true);
+}
+function suppEditSheet(){
+  const edit=!!SP.id,used=suppList().map(x=>normTxt(x.t)),sug=SUPP_SUG.filter(n=>!used.includes(normTxt(n)));
+  return{title:edit?'Editar suplemento':'Nuevo suplemento',body:'<div class="pad">'+
+    '<div class="field"><label for="spN">Nombre</label><input id="spN" maxlength="40" autocomplete="off" value="'+esc(SP.t)+'" placeholder="Por ejemplo, creatina" oninput="SP.t=this.value"></div>'+
+    (!edit&&sug.length?'<div class="schips" role="group" aria-label="Sugerencias de nombre">'+sug.map(n=>'<button class="pill gray" onclick="SP.t=\''+n+'\';drawSheet();a11yFocus($(\'spS\'))">'+n+'</button>').join('')+'</div>':'')+
+    '<div class="field" style="margin-top:14px"><label for="spS">Cantidad</label><input id="spS" maxlength="30" autocomplete="off" value="'+esc(SP.s)+'" placeholder="Por ejemplo, 5 g o 1 cápsula" oninput="SP.s=this.value"></div>'+
+    '<p class="c1 l2 balance" style="padding:8px 4px 0">La que tomas tú, como dice el envase o tu profesional sanitario.</p>'+
+    '<div class="stack" style="margin-top:18px"><button class="btn pri" onclick="suppSave()">Guardar</button>'+
+    (edit?'<button class="btn sec danger" onclick="askSuppDel(\''+SP.id+'\')">Borrar</button>':'')+'</div></div>'};
+}
+function suppSave(){
+  const t=sStr(SP.t,40),s=sStr(SP.s,30);if(!t){toast('Pon el nombre');a11yFocus($('spN'));return}
+  const L=DB.cfg.supps=suppList().slice();
+  if(SP.id){const x=L.find(z=>z.id===SP.id);if(x){x.t=t;x.s=s}}
+  else{let id;do{id='s'+Date.now().toString(36)+Math.floor(Math.random()*36).toString(36)}while(L.some(z=>z.id===id));L.push({id,t,s})}
+  save();render();const back=SHS.length>1;if(back)backSheet();else closeSheet();
+  toast(SP.id?'Guardado':'Añadido: '+t);say((SP.id?'Guardado: ':'Añadido: ')+t+(s?', '+s:''));
+}
+function askSuppDel(id){const x=suppList().find(z=>z.id===id);if(!x)return;confirmSheet('Borrar suplemento','«'+esc(x.t)+'» deja de salir en Comida. Los días que ya lo marcaste no cambian.','Borrar','suppDel(\''+id+'\')',true)}
+function suppDel(id){const x=suppList().find(z=>z.id===id);DB.cfg.supps=suppList().filter(z=>z.id!==id);save();render();
+  SHS.length=Math.max(0,SHS.length-2);SHK.length=SHS.length;if(SHS.length&&suppList().length)drawSheet();else closeSheet();toast('Borrado');say('Borrado: '+(x?x.t:''))}
 
 /* ═════ PESTAÑA Y LÍNEA EN HOY ═════ */
 function applyFoodTab(){
