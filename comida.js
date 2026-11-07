@@ -379,7 +379,7 @@ const limTxt={g:'2 kg',ml:'2 litros',u:'20 unidades'};
 /* lee el formulario: {L, t} o {err, el} */
 function prodRead(){
   const p=pNum(PF.L.p),q=pNum(PF.q),t=pNum(PF.t),U=PF.u;
-  if(p==null)return{err:'Falta la proteína de la etiqueta',el:'pfP'};
+  if(p==null)return{err:PF.noP?'Open Food Facts no trae la proteína':'Falta la proteína de la etiqueta',el:'pfP',noP:PF.noP};
   if(isNaN(p)||p<0||p>5000)return{err:'Revisa la proteína',el:'pfP'};
   if(q==null||isNaN(q)||q<=0)return{err:'Revisa la cantidad de la etiqueta',el:'pfQ'};
   if(q>LIM.q[U])return{err:U==='u'?'La etiqueta no da los valores por '+nStr(q)+' unidades: revisa la cantidad':'Las etiquetas dan los valores por 100 '+U+' o por toma: revisa la cantidad',el:'pfQ'};
@@ -402,8 +402,10 @@ function prodRead(){
 }
 function prodRes(){
   const v=prodRead();
+  if(v.noP)return '<p class="bd">'+v.err+'</p><p class="fn l2 balance" style="padding-top:4px">Mírala en la etiqueta. Si pone 0 g, no hace falta apuntarlo: no suma a tu proteína.</p>';
   if(v.err)return '<p class="fn l2">Cada vez que lo tomas</p><p class="bd" style="padding-top:4px">'+v.err+'</p>';
   const o=mineCalc({L:v.L,t:v.t});
+  if(!v.L.p)return '<p class="fn l2">Cada vez que lo tomas</p><p class="t1 num">0 g de proteína</p><p class="fn l2 balance" style="padding-top:2px">No suma a tu proteína del día, así que no hace falta apuntarlo.</p>';
   return '<p class="fn l2">Cada vez que lo tomas</p><p class="t1 num">'+gTxt(o.p)+' de proteína</p><p class="fn l2 num">en '+mAmt(o,1)+'</p>';
 }
 function prodSheet(){
@@ -416,7 +418,7 @@ function prodSheet(){
     // la etiqueta, tal cual
     '<p class="ghead" role="heading" aria-level="2" style="padding:18px 16px 7px">La etiqueta dice</p>'+
       '<div class="row" style="gap:10px;align-items:flex-end">'+
-        '<div class="field grow"><label for="pfP">Proteína (g)</label>'+inp('pfP',PF.L.p,'PF.L.p=this.value','20')+'</div>'+
+        '<div class="field grow"><label for="pfP">Proteína (g)</label>'+inp('pfP',PF.L.p,'PF.L.p=this.value',PF.noP?'—':'')+'</div>'+
         '<p class="sb" style="padding-bottom:13px">en</p>'+
         '<div class="field grow"><label for="pfQ">Cantidad</label>'+inp('pfQ',PF.q,'PF.q=this.value',U==='u'?'1':'100')+'</div></div>'+
       '<div class="segc" role="group" aria-label="Unidad de la etiqueta" style="margin-top:10px">'+[['g','g'],['ml','ml'],['u','unidad']].map(([k,t])=>'<button class="'+(U===k?'on':'')+'" onclick="prodUnit(\''+k+'\')" aria-pressed="'+(U===k)+'">'+t+'</button>').join('')+'</div>'+
@@ -543,7 +545,7 @@ async function offLookup(code){
   if(!P)return offMsg('No está en Open Food Facts','El código '+code+' no aparece. Créalo a mano con la etiqueta y la próxima vez ya lo tendrás.',offManual(code));
   PF=offToPF(P,code);openProd(null,PF);
 }
-const V_APP='30';
+const V_APP='32';
 function offToPF(P,code){
   const N=P.nutriments||{},num=k=>{const n=parseFloat(N[k]);return isFinite(n)&&n>=0?r1v(n):null};
   const q=String(P.quantity||'')+' '+String(P.serving_size||''),ml=/\d\s*(ml|cl|l)\b/i.test(q)&&!/\d\s*g\b/i.test(String(P.serving_size||''));
@@ -554,6 +556,7 @@ function offToPF(P,code){
   const V={p:num('proteins_100g'),k:kc==null?null:Math.round(kc),f:num('fat_100g'),fs:num('saturated-fat_100g'),c:num('carbohydrates_100g'),s:num('sugars_100g'),fi:num('fiber_100g'),sal:num('salt_100g')};
   Object.keys(V).forEach(k=>o.L[k]=nStr(V[k]));
   if(V.p!=null&&V.p>100)o.L.p='';
+  if(V.p==null)o.noP=true;   // no trae proteína: se dice en la tarjeta, sin cifra de ejemplo que parezca suya
   o.t=sq>=1&&sq<=5000?nStr(Math.round(sq)):'';
   return o;
 }
