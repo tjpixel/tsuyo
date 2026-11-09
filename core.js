@@ -597,6 +597,11 @@ function advise(e){
   const done=L.sets.filter(x=>x&&x.r);
   const mx=Math.max(...done.map(x=>x.w||0));
   const allTop=done.length>=nSteps(e)&&done.every(x=>x.r>=e.hi);
+  /* tope en todas las series que hiciste, pero faltaron series de la rutina (p. ej. 3 de 4): no sube todavía,
+     y el consejo no dice «suma reps» (ya estás arriba), sino que completes las que faltan */
+  const sDone=e.side?(()=>{let c=0;for(let i=0;i<L.sets.length;i+=2)if((L.sets[i]&&L.sets[i].r)||(L.sets[i+1]&&L.sets[i+1].r))c++;return c})():done.length;
+  const topMiss=!allTop&&done.length>0&&sDone<e.s&&done.every(x=>x.r>=e.hi);
+  const MISS=un=>'. Llegaste al tope en '+sDone+' de '+e.s+' series: hoy <b>las '+e.s+' a '+e.hi+' '+un+'</b>'+(e.side?' por lado':'')+' y la próxima toca subir.';
   /* semana ligera: una sola regla (ver arriba). Cada consejo dice qué se baja, con la cifra y de dónde sale,
      qué se queda igual y el esfuerzo. La cifra es la que ya viene puesta en la pantalla. */
   if(LW){
@@ -641,6 +646,7 @@ function advise(e){
       const ex=e.seg&&e.hi>=RANGE_CAP?'Ya aguantas '+e.hi+' '+un+pl+': más tiempo ya no suma tanto. ':'';
       return{txt:TOP(repsTxt(e,L.sets,e.seg?un:'reps'))+ex+(e.prog||'Sube la dificultad del movimiento.'),up:true,w:''};
     }
+    if(topMiss)return{txt:UVc+repsTxt(e,L.sets,e.seg?un:'')+MISS(e.seg?un:'reps'),up:false,w:''};
     if(e.seg){
       const sh=shortTxt(e,L.sets,un);
       return{txt:UVc+repsTxt(e,L.sets,un)+'. '+(sh?sh+' Hoy, <b>'+e.hi+' '+un+pl+'</b> en todas.':'Aguanta un poco más cada vez hasta '+e.hi+' '+un+pl+' en todas las series.'),up:false,w:''};
@@ -649,12 +655,14 @@ function advise(e){
   }
   if(e.opt&&!mx){
     if(allTop)return{txt:TOP(repsTxt(e,L.sets,'reps'))+e.prog,up:true,w:e.inc};
+    if(topMiss)return{txt:(AL?BL+', sin peso → ':'Última vez sin peso → ')+repsTxt(e,L.sets)+MISS('reps'),up:false,w:''};
     return{txt:(AL?BL+', sin peso → ':'Última vez sin peso → ')+repsTxt(e,L.sets)+'. <b>Sin disco</b>: suma repeticiones hasta '+e.hi+(e.side?' por lado':'')+'.',up:false,w:''};
   }
   if(allTop&&e.inc>0){const cz=careZones(e);
     if(cz.length&&!topAt(e,prevFor(e.id,L.d),mx)){const sw=snapW(mx,e.inc);return{txt:TOP(fmtSp(mx)+' kg → '+repsTxt(e,L.sets))+'Como cuidas '+zTxt(cz)+', <b>repite '+fmtSp(sw)+' kg</b> una sesión más; si vuelves a llegar arriba, subimos.',up:false,w:sw}}
   }
   if(allTop&&e.inc>0){const nw=snapW(mx+e.inc,e.inc);return{txt:TOP(fmtSp(mx)+' kg → '+repsTxt(e,L.sets))+'Sube a <b>'+fmtSp(nw)+' kg</b> y vuelve a '+e.lo+' '+u+'.',up:true,w:nw}}
+  if(topMiss&&mx>0)return{txt:UV+fmtSp(mx)+' kg → '+repsTxt(e,L.sets)+MISS(u).replace(' y la próxima',' con '+fmtSp(mx)+' kg y la próxima'),up:false,w:mx};
   if(e.inc===0)return{txt:UVc+repsTxt(e,L.sets)+'. Suma '+(e.seg?(e.min?'minutos':'segundos'):'repeticiones')+'.',up:false,w:''};
   if(offStep(mx,e.inc)){const nw=snapW(mx,e.inc);return{txt:UV+fmtSp(mx)+' kg → '+repsTxt(e,L.sets)+'. '+(isMaq(e)?'Tu máquina va de '+String(e.inc).replace('.',',')+' en '+String(e.inc).replace('.',','):'Vas en saltos de '+String(e.inc).replace('.',',')+' kg')+': ponte en <b>'+nw+' kg</b> y suma '+u+'.',up:false,w:nw}}
   return{txt:UV+fmtSp(mx)+' kg → '+repsTxt(e,L.sets)+'. Mantén peso y suma '+u+'.',up:false,w:mx};
