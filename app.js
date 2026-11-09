@@ -1171,11 +1171,17 @@ function defaultW(e){
   const a=advise(e);if(a.w!=='')return a.w;
   return e.opt?0:null;
 }
+/* repeticiones que se anotan al pulsar «Serie hecha». Si hoy llevas más peso que en la serie de referencia
+   (subida tras llegar al tope, o subida a mano), se empieza por el mínimo del rango: con más peso, lo normal es
+   volver abajo, y copiar las reps de antes invitaba a anotar de más sin darse cuenta */
 function defaultR(e){
   const s=setsFor(e);if(s[SS.si]&&s[SS.si].r)return s[SS.si].r;
-  if(SS.si>0&&s[SS.si-1]&&s[SS.si-1].r)return s[SS.si-1].r;
+  const up=p=>!e.seg&&!e.spd&&SS.w>0&&SS.w>(p.w||0);
+  if(SS.si>0&&s[SS.si-1]&&s[SS.si-1].r)return up(s[SS.si-1])?e.lo:s[SS.si-1].r;
   const lr=lightRepGoal(e);if(lr)return lr;
-  const L=lastFor(e.id),q=L&&L.sets[SS.si];return q&&q.r?q.r:e.lo;
+  const L=lastFor(e.id),q=L&&L.sets[SS.si];
+  if(q&&q.r)return up(q)?e.lo:q.r;
+  return e.lo;
 }
 /* orden libre: si dejas un ejercicio para luego (máquina ocupada), las líneas marcan lo hecho de verdad, no la posición.
    Un ejercicio cuenta como hecho si tiene todas sus series anotadas o si lo pasaste de largo saltando series. */
