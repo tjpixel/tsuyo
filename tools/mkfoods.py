@@ -19,7 +19,7 @@ SEL=[
 ('P',36017,'Pechuga de pollo, cruda',110,None),('P',36018,'Pechuga de pollo, a la plancha',100,None),
 ('P',36024,'Muslo de pollo sin piel, crudo',110,None),('P',36304,'Pechuga de pavo, cruda',110,None),
 ('P',6250,'Ternera picada 5 % de grasa, cruda',110,None),('P',6254,'Ternera picada 15 % de grasa, cruda',110,None),
-('P',6206,'Filete de ternera (cadera), crudo',110,None),('P',28204,'Solomillo de cerdo, crudo',110,None),
+('P',6206,'Filete de ternera (cadera), crudo',110,None),('P',6207,'Filete de ternera (cadera), cocinado',100,None),('P',28204,'Solomillo de cerdo, crudo',110,None),
 ('P',28480,'Lomo de cerdo, crudo',110,None),('P',28202,'Lomo de cerdo, cocinado',100,None),
 ('P',26044,'Merluza, cruda',135,None),('P',26043,'Bacalao fresco, crudo',135,None),('P',26036,'Salmón, crudo',135,None),
 ('P',26065,'Sardina, cruda',135,None),('P',10007,'Gambas, cocidas',135,None),
